@@ -286,6 +286,35 @@ function editKid(s, save) {
     h('button.linklike', { type: 'button', onclick: async () => { await act(() => save(s, { active: !s.active }))(); close(); } }, s.active ? 'Отметить, что ребёнок выбыл из класса' : 'Вернуть в класс')));
 }
 
+// Расписание: одна таблица — уроки по строкам, дни по столбцам, время звонков в первой колонке
+function scheduleEditor(info) {
+  const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const SH = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const grid = DAYS.map(d => {
+    const t = (info.timetable || []).find(x => (x.day || '').trim().toLowerCase() === d.toLowerCase());
+    return t ? t.lessons.split('\n').map(x => x.trim()).map(x => /^[—-]+$/.test(x) ? '' : x) : [];
+  });
+  const times = (info.bells || []).map(b => b.from && b.to ? `${b.from}–${b.to}` : '');
+  let rows = Math.max(6, times.length, ...grid.map(g => g.length));
+  const sync = () => {
+    info.bells = Array.from({ length: rows }, (_, i) => { const m = /(\d{1,2}[:.]\d{2})\D+(\d{1,2}[:.]\d{2})/.exec(times[i] || ''); const f = x => x.replace('.', ':').padStart(5, '0'); return m ? { from: f(m[1]), to: f(m[2]) } : { from: '', to: '' }; });
+    while (info.bells.length && !info.bells[info.bells.length - 1].from) info.bells.pop();
+    info.timetable = DAYS.map((d, j) => { const l = Array.from({ length: rows }, (_, i) => grid[j][i] || ''); while (l.length && !l[l.length - 1]) l.pop(); return { day: d, lessons: l.map(x => x || '—').join('\n') }; }).filter(d => d.lessons);
+  };
+  const body = h('tbody');
+  const draw = () => body.replaceChildren(...Array.from({ length: rows }, (_, i) => h('tr',
+    h('td.sn', i + 1),
+    h('td', h('input.cell.time', { value: times[i] || '', placeholder: '08:00–08:40', oninput: e => { times[i] = e.target.value; sync(); } })),
+    ...DAYS.map((_, j) => h('td', h('input.cell', { value: grid[j][i] || '', oninput: e => { grid[j][i] = e.target.value; sync(); } }))))));
+  draw(); sync();
+  return h('section.card', h('h3', '📅 Расписание уроков и звонков'),
+    h('div.tbl-scroll', h('table.sched-edit', h('thead', h('tr', h('th', '№'), h('th', 'Время'), SH.map(x => h('th', x)))), body)),
+    h('div.row', { style: 'margin-top:6px' },
+      h('button.btn.small', { type: 'button', onclick: () => { rows++; draw(); } }, '+ урок'),
+      h('button.btn.small', { type: 'button', onclick: () => { if (rows > 1) { rows--; grid.forEach(g => g.length = Math.min(g.length, rows)); times.length = Math.min(times.length, rows); sync(); draw(); } } }, '− урок'),
+      h('span.hint', 'Пустая клетка — нет урока.')));
+}
+
 // ---------- Информация ----------
 VIEWS['инфо'] = () => {
   const info = structuredClone(S.info); info.timetable ||= [];
@@ -310,8 +339,7 @@ VIEWS['инфо'] = () => {
   const body = h('div.stack',
     h('p.hint', 'Всё, что здесь заполнено, видно на странице для родителей во вкладке «Информация». После правок нажмите «Сохранить» внизу.'),
     ann,
-    listEditor('Расписание уроков', 'timetable', [['day', 'День недели'], ['lessons', 'Уроки, по одному на строку', 'textarea']], { day: '', lessons: '' }),
-    listEditor('Расписание звонков', 'bells', [['from', 'Начало, 08:00', 'time'], ['to', 'Конец, 08:40', 'time']], { from: '', to: '' }),
+    scheduleEditor(info),
     listEditor('Каникулы и выходные', 'holidays', [['title', 'Название'], ['from', 'С', 'date'], ['to', 'По', 'date']], { title: '', from: '', to: '' }, '.three'),
     listEditor('Учителя', 'teachers', [['role', 'Предмет или роль'], ['name', 'ФИО'], ['contact', 'Телефон / почта (необяз.)']], { role: '', name: '', contact: '' }, '.three'),
     listEditor('Полезные ссылки', 'links', [['title', 'Название'], ['url', 'https://…', 'url']], { title: '', url: '' }),

@@ -363,3 +363,14 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .parents { display: grid; gap: 3px; }
 .prow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .prow .call { font-size: 13px; }
+
+/* Редактор расписания */
+.sched-edit { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 760px; }
+.sched-edit th { font-size: 12px; color: var(--muted); font-weight: 800; text-align: left; padding: 0 4px; }
+.sched-edit td.sn { width: 22px; text-align: center; font-weight: 800; color: var(--accent); font-size: 13px; }
+.sched-edit input.cell { min-height: 0; height: 30px; padding: 3px 7px; font-size: 13px; border-radius: 7px; background: var(--bg); border-color: transparent; }
+.sched-edit input.cell:focus { background: var(--card); }
+.sched-edit input.cell.time { width: 108px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.edit-row { gap: 4px; margin-bottom: 4px; }
+.edit-row input, .edit-row textarea { min-height: 0; height: 32px; padding: 4px 8px; font-size: 13.5px; }
+.edit-row textarea { height: 56px; }
