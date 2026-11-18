@@ -170,12 +170,17 @@ function collectionDialog(c) {
     links.append(row);
   };
   const cur = String(c.pay_link || '').split(/\s+/).filter(Boolean);
+  let qrRemove = false;
+  const qrFile = h('input', { type: 'file', accept: 'image/*' });
+  const qrBox = h('div', c.qr ? h('div.row', h('img', { src: '/uploads/' + c.qr, alt: 'QR', style: 'width:72px;height:72px;object-fit:contain;border-radius:8px;border:1px solid var(--line)' }),
+    h('button.linklike', { type: 'button', onclick: e => { qrRemove = true; e.target.closest('.row').remove(); } }, 'убрать QR')) : null, qrFile);
   (cur.length ? cur : ['']).forEach(addLink);
   const close = modal(isNew ? 'Новый сбор' : 'Изменить сбор', h('form.form', {
     onsubmit: async e => {
       e.preventDefault();
       const body = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]));
       body.pay_link = [...links.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean).join('\n');
+      if (qrFile.files[0]) body.qr = await compressImage(qrFile.files[0], 1000); else if (qrRemove) body.qr_remove = true;
       try { await api(isNew ? 'POST' : 'PUT', '/api/admin/collections' + (isNew ? '' : '/' + c.id), body); close(); toast('Сохранено'); load(); }
       catch (err) { toast(err.message, true); }
     },
@@ -186,6 +191,8 @@ function collectionDialog(c) {
     h('div.field', h('span', 'Ссылки на сбор в банках'), links,
       h('button.linklike', { type: 'button', onclick: () => addLink('') }, '+ ещё банк'),
       h('span.hint', 'Создайте сбор в приложении банка и вставьте ссылку. Можно в нескольких банках: у родителей появится выбор со значками банков.')),
+    h('div.field', h('span', 'QR-код для оплаты (необязательно)'), qrBox,
+      h('span.hint', 'Скриншот QR-кода сбора из приложения банка. Его можно оплатить из приложения любого банка.')),
     h('label.field', 'Описание', f.description),
     !isNew ? h('label.check', f.closed, 'Сбор закрыт (кнопка оплаты у родителей скроется)') : null,
     h('div.row.between',

@@ -498,3 +498,6 @@ div.field .linklike { justify-self: start; }
 .bankbtn .small { color: inherit; opacity: .85; display: block; }
 .bankbtn .go { color: inherit; font-size: 18px; }
 .bankic.inv { background: rgba(255,255,255,.22); color: inherit; }
+.qrpay { margin-top: 10px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 10px 12px; }
+.qrpay summary { cursor: pointer; font-weight: 700; }
+.qrimg { display: block; width: min(240px, 100%); margin: 10px auto; border-radius: 10px; background: #fff; }

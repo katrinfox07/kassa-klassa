@@ -82,6 +82,7 @@ for (const r of q("SELECT id, parent FROM students WHERE phone='' AND parent<>''
 }
 // отдельные сборы (досбор на конкретное дело) не входят в кассу класса
 try { db.exec('ALTER TABLE collections ADD COLUMN separate INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE collections ADD COLUMN qr TEXT NOT NULL DEFAULT ''"); } catch {}
 if (!getSettingRaw('mig_photo_separate')) {
   db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото — 450%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_separate', '1')").run();
@@ -447,16 +448,22 @@ const collectionFields = b => {
   return [title, str(b.description, 2000), amount, isDate(b.due_date) ? b.due_date : null, okLinks(b.pay_link)];
 };
 route('POST', '/admin/collections', (req, res, b, p, u, c) => {
-  q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, class_id) VALUES(?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, c.id);
+  const r = q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, class_id) VALUES(?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, c.id);
+  if (b.qr) q('UPDATE collections SET qr=? WHERE id=?').run(saveImage(b.qr, 'qr'), r.lastInsertRowid);
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/collections/:id', (req, res, b, p, u, c) => {
   q('UPDATE collections SET title=?, description=?, amount=?, due_date=?, pay_link=?, closed=?, separate=? WHERE id=? AND class_id=?')
     .run(...collectionFields(b), b.closed ? 1 : 0, b.separate ? 1 : 0, int(p.id), c.id);
+  if (b.qr || b.qr_remove) {
+    const old = q('SELECT qr FROM collections WHERE id=? AND class_id=?').get(int(p.id), c.id);
+    if (old) { rmFile(old.qr); q('UPDATE collections SET qr=? WHERE id=?').run(b.qr ? saveImage(b.qr, 'qr') : '', int(p.id)); }
+  }
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/collections/:id', (req, res, b, p, u, c) => {
   for (const r of q('SELECT screenshot FROM payments WHERE collection_id=? AND class_id=?').all(int(p.id), c.id)) rmFile(r.screenshot);
+  rmFile(q('SELECT qr FROM collections WHERE id=? AND class_id=?').get(int(p.id), c.id)?.qr);
   q('DELETE FROM collections WHERE id=? AND class_id=?').run(int(p.id), c.id);
   send(res, 200, { ok: true });
 }, W);
@@ -608,7 +615,7 @@ const server = http.createServer(async (req, res) => {
       }
       return fail(res, 404, 'Не найдено');
     }
-    if (p.startsWith('/uploads/') && p.includes('/chek-')) return serveFile(res, path.join(UPLOAD_DIR, path.basename(p)), 'public, max-age=31536000, immutable');
+    if (p.startsWith('/uploads/') && (p.includes('/chek-') || p.includes('/qr-'))) return serveFile(res, path.join(UPLOAD_DIR, path.basename(p)), 'public, max-age=31536000, immutable');
     if (PAGES[p]) return serveFile(res, path.join(PUBLIC_DIR, PAGES[p]));
     if (p === '/manifest.webmanifest') return sendManifest(res, { name: 'Касса класса', short: 'Касса класса', start: '/account' });
     const mm = /^\/c\/([a-z0-9-]+)\/manifest\.webmanifest$/.exec(p);

@@ -93,7 +93,13 @@ load();
       c.pay_link
         ? [h('p.small.muted', (payLinks(c).length > 1 ? 'Выберите банк, откроется страница сбора' : 'Откроется страница сбора в банке') + (c.amount ? ` · ${rub(c.amount)}` : '') + '.'),
            h('div.banks', payLinks(c).map(bankButton))]
+        : c.qr ? null
         : h('p.small.muted', 'Ссылка на оплату пока не добавлена.'),
+      c.qr ? h('details.qrpay', { open: !c.pay_link },
+        h('summary', '📷 Оплатить по QR-коду из любого банка'),
+        h('img.qrimg', { src: '/uploads/' + c.qr, alt: 'QR-код для оплаты' }),
+        h('p.small.muted', 'С другого устройства: отсканируйте камерой в приложении своего банка. С этого телефона: сохраните картинку, затем в приложении банка «Оплата по QR» → «Из галереи».'),
+        h('a.btn.small', { href: '/uploads/' + c.qr, download: 'qr-' + c.id + '.png' }, 'Сохранить QR')) : null,
       S.class.payHint ? h('p.small.pre', { style: 'margin-top:8px' }, S.class.payHint) : null)),
     h('div.step', h('div', h('b', 'Отметьте, что оплатили'), h('p.small.muted', 'Так казначей быстрее найдёт ваш перевод.'), form)));
   const close = modal(c.title, steps);
