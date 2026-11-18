@@ -42,7 +42,7 @@ function collectionCard(c) {
   const dl = c.due_date ? daysLeft(c.due_date) : null;
   const due = c.due_date ? h('span.pill' + (c.closed ? '' : dl < 0 ? '.bad' : dl <= 3 ? '.warn' : '.blue'),
     c.closed ? 'закрыт' : dl < 0 ? 'срок прошёл' : dl === 0 ? 'до сегодня' : 'до ' + fdate(c.due_date)) : c.closed ? h('span.pill.ok', '✓ закрыт') : null;
-  return h('section.card.coll',
+  return h('section.card.coll' + (c.closed ? '.closed' : ''),
     h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), due),
     h('div.meta', c.amount ? `${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
     c.description ? h('p.pre', { style: 'margin-top:8px' }, c.description) : null,

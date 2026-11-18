@@ -441,3 +441,12 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .tbl tr.debt td { background: var(--orange-soft); }
 .tbl tr.debt td:first-child { box-shadow: inset 4px 0 0 var(--orange); }
 .tbl tr.debt .pill.bad { background: var(--orange); color: #fff; }
+
+/* Закрытые сборы — бледные */
+.coll.closed { background: color-mix(in srgb, var(--card) 60%, var(--bg)); box-shadow: none; }
+.coll.closed > *:not(.row):not(details) { opacity: .55; }
+.coll.closed .title, .coll.closed .meta { opacity: .6; }
+.coll.closed::before { background: var(--line); }
+.coll.closed .progress > div { background: #b9c2cc; animation: none; }
+.coll.closed .pill.ok { background: var(--line); color: var(--muted); }
+.coll.closed:hover { transform: none; }

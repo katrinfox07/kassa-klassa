@@ -91,7 +91,7 @@ function collectionAdminCard(c) {
   const paid = active.filter(s => statusOf(S, c, s.id).s === 'paid').length;
   const det = h('details.more', { open: openColl.has(c.id), ontoggle: e => e.target.open ? openColl.add(c.id) : openColl.delete(c.id) },
     h('summary', 'Таблица оплат'), collectionTable(c));
-  return h('section.card.coll',
+  return h('section.card.coll' + (c.closed ? '.closed' : ''),
     h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), c.closed ? h('span.pill.ok', '✓ закрыт') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
     h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
     progress(c),
