@@ -22,9 +22,10 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
-  if (id === 'сборы') m.replaceChildren(collectionsView());
+  const bb = bdayBanner(calEvents(S, false));
+  if (id === 'сборы') m.replaceChildren(...[bb, collectionsView()].filter(Boolean));
   if (id === 'расходы') m.replaceChildren(expensesView());
-  if (id === 'инфо') m.replaceChildren(renderInfo(S.info));
+  if (id === 'инфо') m.replaceChildren(...[bb, calendarCard(S, false), renderInfo(S.info)].filter(Boolean));
 }
 
 function collectionsView() {
@@ -66,7 +67,6 @@ function payDialog(c) {
     }));
   const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: c.amount || '', required: true });
   sel.addEventListener('change', () => { const d = sel.selectedOptions[0]?.dataset.debt; amount.value = d || c.amount || ''; });
-  const payer = h('input', { placeholder: 'Например: мама, Анна', maxlength: 120 });
   const file = h('input', { type: 'file', accept: 'image/*' });
   const btn = h('button.btn.primary.block', { type: 'submit' }, 'Отправить');
   const form = h('form.form', {
@@ -75,7 +75,7 @@ function payDialog(c) {
       btn.disabled = true; btn.textContent = 'Отправляем…';
       try {
         const image = file.files[0] ? await compressImage(file.files[0]) : null;
-        await api('POST', '/api/report-payment', { collection_id: c.id, student_id: sel.value, amount: amount.value, payer: payer.value, image });
+        await api('POST', '/api/report-payment', { collection_id: c.id, student_id: sel.value, amount: amount.value, image });
         close(); toast('Спасибо! Казначей подтвердит оплату.'); if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';
 load();
       } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = 'Отправить'; }
@@ -83,7 +83,6 @@ load();
   },
     h('label.field', 'За кого', sel),
     h('label.field', 'Сумма, ₽', amount),
-    h('label.field', 'Кто платил (необязательно)', payer),
     h('label.field', 'Скриншот перевода (необязательно)', file),
     btn);
 

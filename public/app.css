@@ -505,3 +505,23 @@ div.field .linklike { justify-self: start; }
 .ht-ic { font-size: 30px; }
 .ht-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
 .ht-name { font-size: 18px; font-weight: 800; }
+.edit-row.four { grid-template-columns: 1fr 1.3fr 1fr .6fr auto; }
+@media (max-width: 560px) { .edit-row.four { grid-template-columns: 1fr auto; } .edit-row.four > :nth-child(n+2):not(:last-child) { grid-column: 1; } .edit-row.four > :last-child { grid-row: 1; grid-column: 2; } }
+/* Календарь */
+.cal-head h3 { margin: 0; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin: 8px 0; }
+.cal-w { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 2px 0; }
+.cal-c { aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; position: relative; font-size: 14px; font-variant-numeric: tabular-nums; background: var(--bg); }
+.cal-c.empty { background: none; }
+.cal-c.sun .cal-d { color: var(--bad, #d33); }
+.cal-c.hol { background: var(--ok-soft); }
+.cal-c.today { outline: 2px solid var(--accent); font-weight: 800; }
+.cal-e { position: absolute; bottom: 1px; right: 2px; font-size: 12px; line-height: 1; }
+.cal-list li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.cal-day { min-width: 22px; font-weight: 800; color: var(--accent); }
+.bday-banner { display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, #fff4d6, var(--card)); border: 1.5px solid #f5c04a; }
+.bb-ic { font-size: 30px; animation: bb 1.6s ease-in-out infinite; }
+@keyframes bb { 50% { transform: rotate(-10deg) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .bb-ic { animation: none; } }
+@media (prefers-color-scheme: dark) { .bday-banner { background: linear-gradient(135deg, #3a2f12, var(--card)); } }
+.bday-banner { margin-bottom: 12px; }

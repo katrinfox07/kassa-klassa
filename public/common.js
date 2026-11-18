@@ -298,3 +298,68 @@ function bankButton(b) {
 function bankIcon(b) {
   return h('span.bankic', { style: `background:${b.color};color:${b.ink || '#fff'}` }, b.name.replace(/^Т-/, 'Т').slice(0, 1));
 }
+
+
+// ---------- Календарь и дни рождения ----------
+const pad2 = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+function calEvents(st, admin) {
+  const bdays = [];
+  if (admin) st.students.filter(s => s.active).forEach(s => {
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(s.birth || ''); if (m) bdays.push({ name: s.name, md: `${m[2]}-${m[1]}`, year: +m[3], kid: true });
+  });
+  else (st.birthdays || []).forEach(b => bdays.push({ ...b, kid: true }));
+  (st.info?.teachers || []).forEach(t => {
+    const m = /^(\d{1,2})\.(\d{1,2})/.exec(t.birth || ''); if (m && t.name) bdays.push({ name: t.name, md: `${pad2(m[2])}-${pad2(m[1])}`, teacher: true, role: t.role });
+  });
+  return { bdays, holidays: st.info?.holidays || [], colls: (st.collections || []).filter(c => c.due_date && !c.closed) };
+}
+function upcomingBdays(ev, within = 3) {
+  const t0 = new Date(new Date().toDateString()), out = [];
+  for (let i = 0; i <= within; i++) {
+    const d = new Date(t0); d.setDate(d.getDate() + i);
+    const md = ymd(d).slice(5);
+    ev.bdays.filter(b => b.md === md).forEach(b => out.push({ ...b, in: i, age: b.year ? d.getFullYear() - b.year : null }));
+  }
+  return out;
+}
+const inDays = n => n === 0 ? 'сегодня' : n === 1 ? 'завтра' : n === 2 ? 'послезавтра' : `через ${n} дня`;
+function bdayBanner(ev) {
+  const list = upcomingBdays(ev, 3); if (!list.length) return null;
+  return h('section.card.bday-banner', h('span.bb-ic', '🎂'), h('div', list.map(b => h('div',
+    h('b', inDays(b.in)), ' день рождения у ', h('b', b.teacher ? b.name : b.name), b.teacher ? h('span.muted', ' (учитель)') : null,
+    b.age ? h('span.muted', `, исполнится ${b.age}`) : null))));
+}
+function calendarCard(st, admin) {
+  const ev = calEvents(st, admin);
+  let cur = new Date(); cur = new Date(cur.getFullYear(), cur.getMonth(), 1);
+  const box = h('section.card.cal');
+  const draw = () => {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const first = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
+    const todayS = ymd(new Date());
+    const cells = [];
+    for (let i = 0; i < first; i++) cells.push(h('div.cal-c.empty'));
+    const items = [];
+    for (let d = 1; d <= days; d++) {
+      const ds = `${y}-${pad2(m + 1)}-${pad2(d)}`, md = ds.slice(5);
+      const b = ev.bdays.filter(x => x.md === md);
+      const hol = ev.holidays.find(x => x.from && ds >= x.from && ds <= (x.to || x.from));
+      const due = ev.colls.filter(c => c.due_date === ds);
+      const dow = (first + d - 1) % 7;
+      cells.push(h('div.cal-c' + (ds === todayS ? '.today' : '') + (hol ? '.hol' : '') + (dow === 6 ? '.sun' : ''), { title: [hol?.title, ...b.map(x => 'ДР: ' + x.name), ...due.map(c => 'Сдать: ' + c.title)].filter(Boolean).join('\n') },
+        h('span.cal-d', d), b.length ? h('span.cal-e', '🎂') : due.length ? h('span.cal-e', '💰') : null));
+      b.forEach(x => items.push(h('li', h('span.cal-day', d), h('span', '🎂 ' + x.name, x.teacher ? h('span.muted', ' · учитель') : null))));
+      due.forEach(c => items.push(h('li', h('span.cal-day', d), h('span', '💰 сдать «' + c.title + '»'))));
+      if (hol && (ds === hol.from || d === 1)) items.push(h('li', h('span.cal-day', d), h('span', '🌴 ' + hol.title, hol.to ? h('span.muted', ' до ' + fdate(hol.to)) : null)));
+    }
+    box.replaceChildren(
+      h('div.row.between.cal-head', h('button.icon-btn', { type: 'button', 'aria-label': 'Назад', onclick: () => { cur = new Date(y, m - 1, 1); draw(); } }, '‹'),
+        h('h3', MONTHS_NOM[m] + ' ' + y), h('button.icon-btn', { type: 'button', 'aria-label': 'Вперёд', onclick: () => { cur = new Date(y, m + 1, 1); draw(); } }, '›')),
+      h('div.cal-grid', ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(x => h('div.cal-w', x)), cells),
+      items.length ? h('ul.plain.cal-list', items) : h('p.small.muted', 'В этом месяце событий нет.'));
+  };
+  draw();
+  return box;
+}
+const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];

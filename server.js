@@ -132,6 +132,17 @@ if (!getSettingRaw('mig_5g_noemail')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_noemail', '1')").run();
 }
+// 5Г: день рождения классного руководителя — 12 ноября (со слов казначея)
+if (!getSettingRaw('mig_5g_klbday')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
+  if (row) {
+    const info = JSON.parse(row.value);
+    (info.teachers || []).forEach(t => { if (/классн\S*\s+рук/i.test(t.role || '') && !t.birth) t.birth = '12.11'; });
+    q("UPDATE class_settings SET value=? WHERE class_id=? AND key='info'").run(JSON.stringify(info), cl.id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_klbday', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -285,6 +296,8 @@ function classState(c, admin) {
     subscription: admin ? { paid_until: c.paid_until, active: c.paid_until >= today(), price: PRICE } : undefined,
     info: getSetting(cid, 'info', DEFAULT_INFO),
     students: students.filter(s => s.active || admin).map(s => admin ? s : { id: s.id, name: s.name }),
+    birthdays: !admin && getSetting(cid, 'class', {}).showBirthdays ? students.filter(s => s.active).map(s => {
+      const m = /^(\d{2})\.(\d{2})\./.exec(s.birth || ''); return m ? { name: s.name, md: `${m[2]}-${m[1]}` } : null; }).filter(Boolean) : undefined,
     collections,
     payments: admin ? payments : payments.map(p => ({ collection_id: p.collection_id, student_id: p.student_id, amount: p.amount, status: p.status })),
     expenses,
@@ -563,7 +576,7 @@ route('PUT', '/admin/info', (req, res, b, p, u, c) => {
 route('PUT', '/admin/class', (req, res, b, p, u, c) => {
   const title = str(b.title, 100) || c.title;
   q('UPDATE classes SET title=? WHERE id=?').run(title, c.id);
-  setSetting(c.id, 'class', { treasurer: str(b.treasurer, 100), payHint: str(b.payHint, 1000) });
+  setSetting(c.id, 'class', { treasurer: str(b.treasurer, 100), payHint: str(b.payHint, 1000), showBirthdays: !!b.showBirthdays });
   if (b.opening !== undefined) setSetting(c.id, 'opening', { amount: Math.max(0, int(b.opening) || 0), note: str(b.openingNote, 200) });
   send(res, 200, { ok: true });
 }, W);

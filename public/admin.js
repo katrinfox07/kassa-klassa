@@ -37,6 +37,7 @@ async function load() {
     { id: 'проверить', label: 'Проверить', badge: pending || null },
     { id: 'сборы', label: 'Сборы' },
     { id: 'расходы', label: 'Расходы' },
+    { id: 'календарь', label: 'Календарь' },
     { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
     { id: 'настройки', label: 'Настройки' },
@@ -44,7 +45,7 @@ async function load() {
 }
 
 const VIEWS = {};
-function show(id) { $('#main').replaceChildren(VIEWS[id]()); }
+function show(id) { const bb = ['проверить', 'сборы', 'календарь'].includes(id) && bdayBanner(calEvents(S, true)); $('#main').replaceChildren(...[bb, VIEWS[id]()].filter(Boolean)); }
 const act = (fn, okMsg) => async (...a) => { try { await fn(...a); if (okMsg) toast(okMsg); await load(); } catch (e) { toast(e.message, true); } };
 const sName = id => S.students.find(s => s.id === id)?.name || '—';
 const cTitle = id => S.collections.find(c => c.id === id)?.title || '—';
@@ -367,11 +368,15 @@ VIEWS['инфо'] = () => {
     ann,
     scheduleEditor(info),
     listEditor('Каникулы и выходные', 'holidays', [['title', 'Название'], ['from', 'С', 'date'], ['to', 'По', 'date']], { title: '', from: '', to: '' }, '.three'),
-    listEditor('Учителя', 'teachers', [['role', 'Предмет или роль'], ['name', 'ФИО'], ['contact', 'Телефон / почта (необяз.)']], { role: '', name: '', contact: '' }, '.three'),
+    listEditor('Учителя', 'teachers', [['role', 'Предмет или роль'], ['name', 'ФИО'], ['contact', 'Телефон / почта (необяз.)'], ['birth', 'ДР, дд.мм']], { role: '', name: '', contact: '', birth: '' }, '.four'),
     listEditor('Полезные ссылки', 'links', [['title', 'Название'], ['url', 'https://…', 'url']], { title: '', url: '' }),
     h('div.savebar', h('button.btn.primary.block', { onclick: save }, 'Сохранить')));
   return body;
 };
+
+// ---------- Календарь ----------
+VIEWS['календарь'] = () => h('div.stack', calendarCard(S, true),
+  h('p.hint', 'Дни рождения детей берутся из «Списка класса», учителей — из «Информации». Родители видят дни рождения, только если включить это в «Настройках».'));
 
 // ---------- Настройки ----------
 VIEWS['настройки'] = () => {
@@ -381,6 +386,7 @@ VIEWS['настройки'] = () => {
     payHint: h('textarea', { placeholder: 'Например: если не получается по ссылке — напишите мне в чат' }, S.class.payHint),
     opening: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: S.opening?.amount || 0 }),
     openingNote: h('input', { value: S.opening?.note || '', maxlength: 200, placeholder: 'Например: остаток прошлых сборов' }),
+    showBirthdays: h('input', { type: 'checkbox', checked: !!S.class.showBirthdays }),
   };
   return h('div.stack',
     h('section.card.form', h('h3', 'Класс'),
@@ -388,7 +394,8 @@ VIEWS['настройки'] = () => {
       h('label.field', 'Казначей', f.treasurer),
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
-      h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value]))), 'Сохранено') }, 'Сохранить')),
+      h('label.check', f.showBirthdays, 'Показывать родителям дни рождения детей в календаре (только день и месяц)'),
+      h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]))), 'Сохранено') }, 'Сохранить')),
     h('section.card', h('h3', 'Резервная копия'), h('p.hint', 'Скачайте все данные (сборы, оплаты, расходы) одним файлом.'),
       h('a.btn', { href: apiUrl('/api/admin/export') }, 'Скачать копию')),
     h('section.card.form', h('h3', 'Ссылка для родителей'),
