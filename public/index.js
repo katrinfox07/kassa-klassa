@@ -101,7 +101,7 @@ load();
         h('p.small.muted', 'С другого устройства: отсканируйте камерой в приложении своего банка. С этого телефона: сохраните картинку, затем в приложении банка «Оплата по QR» → «Из галереи».'),
         h('a.btn.small', { href: '/uploads/' + c.qr, download: 'qr-' + c.id + '.png' }, 'Сохранить QR')) : null,
       S.class.payHint ? h('p.small.pre', { style: 'margin-top:8px' }, S.class.payHint) : null)),
-    h('div.step', h('div', h('b', 'Отметьте, что оплатили'), h('p.small.muted', 'Так казначей быстрее найдёт ваш перевод.'), form)));
+    h('div.step', h('div', h('b', 'Отметьте, что оплатили'), h('p.small.muted', 'Так ваш перевод точно не потеряется.'), form)));
   const close = modal(c.title, steps);
 }
 
