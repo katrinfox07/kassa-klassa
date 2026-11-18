@@ -1,0 +1,9 @@
+{
+  "name": "kassa-klassa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Касса класса: сервис для казначеев — сборы, оплаты родителей, чеки, информация класса",
+  "main": "server.js",
+  "scripts": { "start": "node --disable-warning=ExperimentalWarning server.js" },
+  "engines": { "node": ">=22.13" }
+}

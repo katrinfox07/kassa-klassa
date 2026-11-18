@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Касса класса — сервис для казначея класса</title>
+<meta name="description" content="Сборы, оплаты родителей, чеки и отчёт в одном приложении. Родители видят, кто сдал и на что потрачено. 399 ₽ в год за класс, первый месяц бесплатно.">
+<meta name="theme-color" content="#2f6fde">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .hero { padding: 40px 0 28px; display: grid; gap: 16px; }
+  .hero h1 { font-size: clamp(28px, 6vw, 44px); letter-spacing: -.02em; }
+  .hero p.lead { font-size: 18px; color: var(--muted); max-width: 620px; margin: 0; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 8px 0 24px; }
+  .feature h3 { margin-bottom: 6px; }
+  .feature p { color: var(--muted); margin: 0; font-size: 15px; }
+  .price { text-align: center; padding: 28px 16px; }
+  .price .big { font-size: 40px; font-weight: 750; letter-spacing: -.02em; }
+  .how { counter-reset: s; display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .how li { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; }
+  .how li::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .plainlink { color: inherit; text-decoration: none; }
+  section.block { margin: 28px 0; }
+  section.block > h2 { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="row"><img src="/icon.svg" width="32" height="32" alt=""><b style="font-size:18px">Касса класса</b></div>
+    <div class="row"><a class="btn small" href="/account">Войти</a></div>
+  </header>
+
+  <section class="hero">
+    <h1>Касса класса без таблиц и переписок в чате</h1>
+    <p class="lead">Сборы, оплаты родителей, чеки и отчёт в одном приложении. Родители сами видят, кто сдал и на что потрачены деньги.</p>
+    <div class="row"><a class="btn primary" href="/account#register">Попробовать бесплатно</a><span class="muted small" id="trial">30 дней бесплатно, без карты</span></div>
+  </section>
+
+  <div class="features">
+    <div class="card feature"><h3>💸 Сборы и оплаты</h3><p>Создайте сбор и вставьте ссылку на банковский сбор. Родитель оплачивает и отмечает «Я оплатил», а вы подтверждаете одним касанием.</p></div>
+    <div class="card feature"><h3>✅ Кто сдал</h3><p>Таблица по каждому сбору и готовое напоминание в чат со списком тех, кто ещё не сдал.</p></div>
+    <div class="card feature"><h3>🧾 Чеки и отчёт</h3><p>Сфотографируйте чек, и расход сразу появится в отчёте для родителей. Баланс кассы всегда на виду.</p></div>
+    <div class="card feature"><h3>📅 Информация класса</h3><p>Объявления, расписание звонков, каникулы, учителя и полезные ссылки в одном месте.</p></div>
+    <div class="card feature"><h3>📲 Приложение на телефон</h3><p>Ставится с сайта на Android и iPhone, иконка появляется на экране. Родителям не нужна регистрация.</p></div>
+    <div class="card feature"><h3>🔒 Аккуратно с данными</h3><p>Храним только фамилию и имя ребёнка. Скриншоты переводов видит только казначей.</p></div>
+  </div>
+
+  <section class="block">
+    <h2>Как это работает</h2>
+    <ol class="how">
+      <li><div><b>Зарегистрируйтесь</b> и создайте класс, вставив список детей.</div></li>
+      <li><div><b>Создайте сбор</b>: название, сумма, срок и ссылка на сбор в вашем банке.</div></li>
+      <li><div><b>Отправьте ссылку</b> в чат класса. Родители оплачивают и отмечаются.</div></li>
+      <li><div><b>Подтверждайте оплаты</b> и добавляйте чеки. Отчёт для родителей собирается сам.</div></li>
+    </ol>
+  </section>
+
+  <section class="card price">
+    <div class="muted">Один класс</div>
+    <div class="big" id="price">399 ₽</div>
+    <div class="muted">в год · первые 30 дней бесплатно</div>
+    <p style="margin-top:14px"><a class="btn primary" href="/account#register">Начать бесплатно</a></p>
+  </section>
+
+  <footer class="foot">
+    <a href="/oferta">Условия сервиса</a> · <a href="/privacy">Персональные данные</a>
+  </footer>
+</div>
+<script src="/common.js"></script>
+<script>
+api('GET', '/api/config').then(c => {
+  $('#price').textContent = rub(c.price);
+  $('#trial').textContent = c.trialDays + ' дней бесплатно, без карты';
+}).catch(() => {});
+</script>
+</body>
+</html>
