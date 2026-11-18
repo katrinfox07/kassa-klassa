@@ -101,14 +101,15 @@ if (!getSettingRaw('mig_5g_fix')) {
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   if (cl) {
-    const info = getSetting(cl.id, 'info', DEFAULT_INFO);
+    const row = q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
+    const info = row ? JSON.parse(row.value) : {};
     info.holidays = [
       { title: 'Осенние каникулы', from: '2026-11-01', to: '2026-11-08' },
       { title: 'Зимние каникулы', from: '2026-12-30', to: '2027-01-10' },
       { title: 'Весенние каникулы', from: '2027-03-28', to: '2027-04-04' },
       { title: 'Летние каникулы', from: '2027-05-27', to: '2027-08-31' },
     ];
-    setSetting(cl.id, 'info', info);
+    q("INSERT INTO class_settings(class_id,key,value) VALUES(?,'info',?) ON CONFLICT(class_id,key) DO UPDATE SET value=excluded.value").run(cl.id, JSON.stringify(info));
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_holidays', '1')").run();
 }
