@@ -492,3 +492,9 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .pend-shot.none { font-size: 20px; }
 .recon-head { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; }
 div.field .linklike { justify-self: start; }
+/* банковские кнопки цвета банка */
+.bankbtn { background: var(--bk); color: var(--bkink); border: 0; box-shadow: 0 4px 14px -6px var(--bk); }
+.bankbtn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.bankbtn .small { color: inherit; opacity: .85; display: block; }
+.bankbtn .go { color: inherit; font-size: 18px; }
+.bankic.inv { background: rgba(255,255,255,.22); color: inherit; }

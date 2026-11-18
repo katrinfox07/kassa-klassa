@@ -268,7 +268,7 @@ new MutationObserver(() => document.querySelectorAll('input[type=file]:not([data
 
 // ---------- Банки сборов ----------
 const BANKS = [
-  { re: /(^|\.)(sberbank|sber)\.(ru|com)$|(^|\.)sber\.ru$/, name: 'Сбер', color: '#21A038', note: 'для клиентов Сбера' },
+  { re: /(^|\.)(sberbank|sber|sbrf|sberbank-online)\.(ru|com)$/, name: 'Сбер', color: '#21A038', note: 'для клиентов Сбера' },
   { re: /(^|\.)vtb\.ru$/, name: 'ВТБ', color: '#0A2896', note: 'из любого банка по СБП' },
   { re: /(^|\.)(tbank|tinkoff)\.ru$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'из любого банка по СБП' },
   { re: /(^|\.)alfabank\.ru$|(^|\.)alfa\.me$/, name: 'Альфа-Банк', color: '#EF3124', note: 'из любого банка по СБП' },
@@ -283,6 +283,11 @@ function bankOf(url) {
   return b ? { ...b, url } : { name: host || 'Банк', color: '#6b7280', url };
 }
 function payLinks(c) { return String(c.pay_link || '').split(/\s+/).filter(Boolean).map(bankOf); }
+function bankButton(b) {
+  return h('a.bankbtn', { href: b.url, target: '_blank', rel: 'noopener', style: `--bk:${b.color};--bkink:${b.ink || '#fff'}` },
+    h('span.bankic.inv', b.name.replace(/^Т-/, 'Т').slice(0, 1)),
+    h('span.grow', h('b', 'Оплатить через ' + b.name), b.note ? h('span.small', b.note) : null), h('span.go', '↗'));
+}
 function bankIcon(b) {
   return h('span.bankic', { style: `background:${b.color};color:${b.ink || '#fff'}` }, b.name.replace(/^Т-/, 'Т').slice(0, 1));
 }

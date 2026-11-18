@@ -92,8 +92,7 @@ load();
       h('b', 'Переведите деньги'),
       c.pay_link
         ? [h('p.small.muted', (payLinks(c).length > 1 ? 'Выберите банк, откроется страница сбора' : 'Откроется страница сбора в банке') + (c.amount ? ` · ${rub(c.amount)}` : '') + '.'),
-           h('div.banks', payLinks(c).map(b => h('a.bankbtn', { href: b.url, target: '_blank', rel: 'noopener' },
-             bankIcon(b), h('span', h('b', b.name), b.note ? h('span.small', b.note) : null), h('span.go', 'Оплатить ↗'))))]
+           h('div.banks', payLinks(c).map(bankButton))]
         : h('p.small.muted', 'Ссылка на оплату пока не добавлена.'),
       S.class.payHint ? h('p.small.pre', { style: 'margin-top:8px' }, S.class.payHint) : null)),
     h('div.step', h('div', h('b', 'Отметьте, что оплатили'), h('p.small.muted', 'Так казначей быстрее найдёт ваш перевод.'), form)));
