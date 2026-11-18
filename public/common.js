@@ -270,7 +270,7 @@ new MutationObserver(() => document.querySelectorAll('input[type=file]:not([data
 const BANKS = [
   { re: /(^|\.)(sberbank|sber|sbrf|sberbank-online)\.(ru|com)$/, name: 'Сбер', color: '#21A038', note: 'для клиентов Сбера' },
   { re: /(^|\.)vtb\.ru$/, name: 'ВТБ', color: '#0A2896', note: 'из любого банка по СБП' },
-  { re: /(^|\.)(tbank|tinkoff|tb)\.ru$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'из любого банка по СБП' },
+  { re: /(^|\.)(tbank|tinkoff|tb)\.ru$|(^|\.)tbank-online\.com$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'из любого банка по СБП' },
   { re: /(^|\.)alfabank\.ru$|(^|\.)alfa\.me$/, name: 'Альфа-Банк', color: '#EF3124', note: 'из любого банка по СБП' },
   { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF' },
   { re: /(^|\.)gazprombank\.ru$/, name: 'Газпромбанк', color: '#0F2D69' },
