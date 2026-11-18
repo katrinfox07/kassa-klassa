@@ -71,6 +71,8 @@ const q = (sql) => db.prepare(sql);
 for (const col of ['full_name', 'birth', 'parent']) {
   try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
 }
+// убрать служебную пометку после переноса из таблицы
+db.exec(`UPDATE collections SET description = trim(replace(replace(description, ' Перенесено из таблицы.', ''), 'Перенесено из таблицы.', '')) WHERE description LIKE '%Перенесено из таблицы.%'`);
 // Строка из таблицы: «ФИО ребёнка [tab] дата рождения [tab] ФИО родителя» (или через пробелы)
 function parseStudent(line) {
   let cells = String(line).split('\t').map(x => x.trim()).filter(Boolean);
