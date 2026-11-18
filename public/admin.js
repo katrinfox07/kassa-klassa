@@ -37,7 +37,6 @@ async function load() {
     { id: 'проверить', label: 'Проверить', badge: pending || null },
     { id: 'сборы', label: 'Сборы' },
     { id: 'расходы', label: 'Расходы' },
-    { id: 'календарь', label: 'Календарь' },
     { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
     { id: 'настройки', label: 'Настройки' },
@@ -45,7 +44,7 @@ async function load() {
 }
 
 const VIEWS = {};
-function show(id) { const bb = ['проверить', 'сборы', 'календарь'].includes(id) && bdayBanner(calEvents(S, true)); $('#main').replaceChildren(...[bb, VIEWS[id]()].filter(Boolean)); }
+function show(id) { const bb = ['проверить', 'сборы'].includes(id) && bdayBanner(calEvents(S, true)); $('#main').replaceChildren(...[bb, VIEWS[id]()].filter(Boolean)); }
 const act = (fn, okMsg) => async (...a) => { try { await fn(...a); if (okMsg) toast(okMsg); await load(); } catch (e) { toast(e.message, true); } };
 const sName = id => S.students.find(s => s.id === id)?.name || '—';
 const cTitle = id => S.collections.find(c => c.id === id)?.title || '—';
@@ -373,14 +372,6 @@ VIEWS['инфо'] = () => {
     h('div.savebar', h('button.btn.primary.block', { onclick: save }, 'Сохранить')));
   return body;
 };
-
-// ---------- Календарь ----------
-VIEWS['календарь'] = () => h('div.stack',
-  h('label.check.card', { style: 'padding:10px 14px' }, h('input', { type: 'checkbox', checked: !!S.class.showBirthdays,
-    onchange: act(e => api('PUT', '/api/admin/class', { title: S.class.title, treasurer: S.class.treasurer || '', payHint: S.class.payHint || '', showBirthdays: e.target.checked }), 'Сохранено') }),
-    'Показывать родителям дни рождения детей (без года)'),
-  calendarCard(S, true),
-  h('p.hint', 'Дни рождения детей берутся из «Списка класса», учителей — из «Информации».'));
 
 // ---------- Настройки ----------
 VIEWS['настройки'] = () => {

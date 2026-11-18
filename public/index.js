@@ -25,7 +25,7 @@ function show(id) {
   const bb = bdayBanner(calEvents(S, false));
   if (id === 'сборы') m.replaceChildren(...[bb, collectionsView()].filter(Boolean));
   if (id === 'расходы') m.replaceChildren(expensesView());
-  if (id === 'инфо') m.replaceChildren(...[bb, calendarCard(S, false), renderInfo(S.info)].filter(Boolean));
+  if (id === 'инфо') m.replaceChildren(...[bb, renderInfo(S.info)].filter(Boolean));
 }
 
 function collectionsView() {
