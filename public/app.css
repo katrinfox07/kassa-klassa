@@ -450,3 +450,15 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .coll.closed .progress > div { background: #b9c2cc; animation: none; }
 .coll.closed .pill.ok { background: var(--line); color: var(--muted); }
 .coll.closed:hover { transform: none; }
+
+/* Поле для фото */
+.dropzone { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; padding: 12px 14px; border: 2px dashed var(--line); border-radius: 14px; background: var(--bg); cursor: pointer; transition: border-color .15s, background .15s; color: var(--text); }
+.dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; min-height: 0; }
+.dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone.over { transform: scale(1.01); }
+.dz-icon { font-size: 26px; }
+.dz-text { display: grid; font-size: 14px; } .dz-text span { color: var(--muted); font-size: 13px; }
+.dz-previews { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.dz-previews:empty { display: none; }
+.dz-previews img { width: 56px; height: 56px; object-fit: cover; border-radius: 9px; box-shadow: var(--shadow); }
+.dropzone.has { border-style: solid; border-color: var(--ok); }

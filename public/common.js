@@ -236,3 +236,32 @@ function expRow(e, coll, extra) {
     h('div.expmain', h('div.exptitle', e.title), h('div.expmeta', fdate(e.date) + (coll ? ' · ' + coll : '') + (e.note ? ' · ' + e.note : ''))),
     h('div.expsum', rub(e.amount)), extra || null);
 }
+
+// ---------- Поле для фото: перетащите файлы или нажмите, с миниатюрами ----------
+function enhanceFileInput(inp) {
+  if (inp.dataset.dz) return; inp.dataset.dz = '1';
+  const multi = inp.multiple;
+  const text = h('div.dz-text', h('b', multi ? 'Перетащите фото сюда' : 'Перетащите фото сюда'), h('span', 'или нажмите, чтобы выбрать' + (isIOS() || /android/i.test(navigator.userAgent) ? ' / сфотографировать' : '')));
+  const previews = h('div.dz-previews');
+  const zone = h('div.dropzone', h('div.dz-icon', '📷'), text, previews);
+  inp.replaceWith(zone); zone.prepend(inp);
+  const show = () => {
+    previews.replaceChildren(...[...inp.files].map(f => { const u = URL.createObjectURL(f); return h('img', { src: u, alt: f.name, onload: () => URL.revokeObjectURL(u) }); }));
+    zone.classList.toggle('has', inp.files.length > 0);
+    text.firstChild.textContent = inp.files.length ? `Выбрано: ${inp.files.length}` : 'Перетащите фото сюда';
+  };
+  inp.addEventListener('change', show);
+  ['dragenter', 'dragover'].forEach(t => zone.addEventListener(t, e => { e.preventDefault(); zone.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(t => zone.addEventListener(t, e => { e.preventDefault(); zone.classList.remove('over'); }));
+  zone.addEventListener('drop', e => {
+    const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')); if (!files.length) return;
+    const dt = new DataTransfer();
+    if (multi) [...inp.files].forEach(f => dt.items.add(f));
+    (multi ? files : files.slice(0, 1)).forEach(f => dt.items.add(f));
+    inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+new MutationObserver(() => document.querySelectorAll('input[type=file]:not([data-dz])').forEach(enhanceFileInput))
+  .observe(document.documentElement, { childList: true, subtree: true });
+// не даём браузеру открыть файл, если промахнулись мимо поля
+['dragover', 'drop'].forEach(t => window.addEventListener(t, e => { if (!e.target.closest?.('.dropzone')) e.preventDefault(); }));
