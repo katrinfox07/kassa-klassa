@@ -37,7 +37,7 @@
   <section class="hero">
     <h1>Касса класса без таблиц и переписок в чате</h1>
     <p class="lead">Сборы, оплаты родителей, чеки и отчёт в одном приложении. Родители сами видят, кто сдал и на что потрачены деньги.</p>
-    <div class="row"><a class="btn primary" href="/account#register">Попробовать бесплатно</a><span class="muted small" id="trial">30 дней бесплатно, без карты</span></div>
+    <div class="row"><a class="btn primary" href="/account#register">Попробовать бесплатно</a><span class="muted small" id="trial">30 дней бесплатно</span></div>
   </section>
 
   <div class="features">
@@ -74,7 +74,7 @@
 <script>
 api('GET', '/api/config').then(c => {
   $('#price').textContent = rub(c.price);
-  $('#trial').textContent = c.trialDays + ' дней бесплатно, без карты';
+  $('#trial').textContent = c.trialDays + ' дней бесплатно';
 }).catch(() => {});
 </script>
 </body>
