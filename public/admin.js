@@ -165,7 +165,7 @@ function collectionDialog(c) {
     h('label.field', 'Название', f.title),
     h('div.two', h('label.field', 'С каждого ребёнка, ₽', f.amount), h('label.field', 'Сдать до', f.due_date)),
     h('label.field', 'Ссылка на банковский сбор', f.pay_link,
-      h('span.hint', 'Создайте сбор в приложении своего банка и вставьте сюда ссылку на него. По ней родители оплатят с карты любого банка или по СБП.')),
+      h('span.hint', 'Создайте сбор в приложении своего банка и вставьте сюда ссылку на него. По ней родители перейдут к оплате.')),
     h('label.field', 'Описание', f.description),
     !isNew ? h('label.check', f.closed, 'Сбор закрыт (кнопка оплаты у родителей скроется)') : null,
     h('div.row.between',
