@@ -52,18 +52,20 @@ function collectionCard(c) {
     h('details.more', h('summary', 'Кто сдал'),
       h('ul.kids', kids.map(({ s, st }) => h('li', h('span.name', s.name),
         st.s === 'paid' ? h('span.dot.paid', { title: 'Оплачено' }, '✓') :
+        st.s === 'partial' ? h('span.pill.bad', { title: 'Оплачено ' + rub(st.amount) }, 'долг ' + rub(st.debt)) :
         st.s === 'pending' ? h('span.dot.pending', { title: 'Ждёт подтверждения казначея' }, '…') :
         h('span.dot.none', { title: 'Не оплачено' }, '–')))),
-      h('p.hint', { style: 'margin-top:8px' }, '✓ оплачено   … ждёт подтверждения   – не оплачено')));
+      h('p.hint', { style: 'margin-top:8px' }, '✓ оплачено   … ждёт подтверждения   – не оплачено   «долг» — оплачено не полностью')));
 }
 
 function payDialog(c) {
   const sel = h('select', { required: true }, h('option', { value: '' }, 'Выберите ребёнка'),
     S.students.map(s => {
-      const st = statusOf(S, c, s.id).s;
-      return h('option', { value: s.id, disabled: st === 'paid' }, s.name + (st === 'paid' ? ' — оплачено' : st === 'pending' ? ' — ждёт подтверждения' : ''));
+      const x = statusOf(S, c, s.id), st = x.s;
+      return h('option', { value: s.id, disabled: st === 'paid', 'data-debt': x.debt || '' }, s.name + (st === 'paid' ? ' — оплачено' : st === 'partial' ? ' — доплатить ' + rub(x.debt) : st === 'pending' ? ' — ждёт подтверждения' : ''));
     }));
   const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: c.amount || '', required: true });
+  sel.addEventListener('change', () => { const d = sel.selectedOptions[0]?.dataset.debt; amount.value = d || c.amount || ''; });
   const payer = h('input', { placeholder: 'Например: мама, Анна', maxlength: 120 });
   const file = h('input', { type: 'file', accept: 'image/*' });
   const btn = h('button.btn.primary.block', { type: 'submit' }, 'Отправить казначею');

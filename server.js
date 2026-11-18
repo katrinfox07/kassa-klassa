@@ -283,7 +283,8 @@ route('POST', '/report-payment', async (req, res, b, p, u, c) => {
   if (!s) bad('Выберите ребёнка');
   const amount = int(b.amount);
   if (!(amount > 0 && amount < 1e7)) bad('Укажите сумму');
-  if (q("SELECT 1 FROM payments WHERE collection_id=? AND student_id=? AND status='confirmed'").get(k.id, s.id)) bad('Оплата за этого ребёнка уже подтверждена');
+  const paidSum = q("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE collection_id=? AND student_id=? AND status='confirmed'").get(k.id, s.id).s;
+  if (paidSum > 0 && (!k.amount || paidSum >= k.amount)) bad('Оплата за этого ребёнка уже подтверждена');
   const shot = b.image ? saveImage(b.image, 'pay') : null;
   const old = q("SELECT id, screenshot FROM payments WHERE collection_id=? AND student_id=? AND status='pending'").get(k.id, s.id);
   if (old) { rmFile(old.screenshot); q('DELETE FROM payments WHERE id=?').run(old.id); }

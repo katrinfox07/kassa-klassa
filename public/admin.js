@@ -95,7 +95,8 @@ function collectionAdminCard(c) {
     h('div.row.between', h('div.title.grow', c.title), c.closed ? h('span.pill', 'завершён') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
     h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
     progress(c),
-    h('div.row.between.small', h('span', `Сдали ${paid} из ${active.length}`, c.pending ? h('span.pill.warn', { style: 'margin-left:6px' }, c.pending + ' на проверке') : null),
+    h('div.row.between.small', h('span', `Сдали ${paid} из ${active.length}`,
+      (n => n ? h('span.pill.bad', { style: 'margin-left:6px' }, n + ' с долгом') : null)(active.filter(s => statusOf(S, c, s.id).s === 'partial').length), c.pending ? h('span.pill.warn', { style: 'margin-left:6px' }, c.pending + ' на проверке') : null),
       h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}${c.spent ? ' · потрачено ' + rub(c.spent) : ''}`)),
     h('div.row', { style: 'margin-top:10px' },
       h('button.btn.small', { onclick: () => collectionDialog(c) }, 'Изменить'),
@@ -113,6 +114,11 @@ function collectionTable(c) {
     if (st.s === 'paid') {
       status = h('span.pill.ok', 'оплачено ' + rub(st.amount));
       actions = [conf[0] && shotBtn(conf[0]), h('button.btn.small', { onclick: act(() => Promise.all(conf.map(p => p.source === 'treasurer' ? api('DELETE', '/api/admin/payments/' + p.id) : api('PUT', '/api/admin/payments/' + p.id, { status: 'pending' })))) }, 'Отменить')];
+    } else if (st.s === 'partial') {
+      status = h('span.pill.bad', `оплачено ${rub(st.amount)} · долг ${rub(st.debt)}`);
+      actions = [pend && shotBtn(pend), pend && h('button.btn.ok.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + pend.id, { status: 'confirmed' })) }, '✓ доплату'),
+        !pend && h('button.btn.small', { onclick: () => markPaid(c, s, st.debt) }, 'Отметить доплату'),
+        h('button.btn.small', { onclick: act(() => Promise.all(conf.map(p => p.source === 'treasurer' ? api('DELETE', '/api/admin/payments/' + p.id) : api('PUT', '/api/admin/payments/' + p.id, { status: 'pending' })))) }, 'Отменить')].filter(Boolean);
     } else if (st.s === 'pending') {
       status = h('span.pill.warn', 'на проверке ' + rub(pend.amount));
       actions = [shotBtn(pend), h('button.btn.ok.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + pend.id, { status: 'confirmed' })) }, '✓'),
@@ -121,13 +127,13 @@ function collectionTable(c) {
       status = h('span.pill', 'не оплачено');
       actions = [h('button.btn.small', { onclick: () => markPaid(c, s) }, 'Отметить оплату')];
     }
-    return h('tr', { class: s.active ? '' : 'out' }, h('td', s.name), h('td', status), h('td', h('div.actions', actions)));
+    return h('tr', { class: (s.active ? '' : 'out') + (st.s === 'partial' ? ' debt' : '') }, h('td', s.name), h('td', status), h('td', h('div.actions', actions)));
   });
   return h('div.tbl-scroll', { style: 'margin-top:8px' }, h('table.tbl', h('tbody', rows)));
 }
 
-function markPaid(c, s) {
-  const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: c.amount || '', required: true });
+function markPaid(c, s, def) {
+  const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: def || c.amount || '', required: true });
   const note = h('input', { placeholder: 'Например: наличными', maxlength: 300 });
   const close = modal('Отметить оплату', h('form.form', {
     onsubmit: async e => { e.preventDefault(); await act(() => api('POST', '/api/admin/payments', { collection_id: c.id, student_id: s.id, amount: amount.value, note: note.value }), 'Отмечено')(); close(); },
@@ -177,10 +183,12 @@ function confirmInline(closePrev, text, onYes) {
 
 function remind(c) {
   const notPaid = S.students.filter(s => s.active && statusOf(S, c, s.id).s === 'none').map(s => s.name);
+  const debts = S.students.filter(s => s.active).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
   const url = classUrl();
   const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount ? ` — ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
     (c.pay_link ? `Оплатить: ${c.pay_link}\n` : '') + `После оплаты отметьтесь, пожалуйста, на странице класса: ${url}\n` +
-    (notPaid.length && notPaid.length < S.students.length ? `\nПока не сдали: ${notPaid.join(', ')}.` : '');
+    (notPaid.length && notPaid.length < S.students.length ? `\nПока не сдали: ${notPaid.join(', ')}.` : '') +
+    (debts.length ? `\nНужно доплатить: ${debts.join(', ')}.` : '');
   const ta = h('textarea', { rows: 9 }, text);
   modal('Текст для чата класса', h('div.form', ta, h('button.btn.primary', {
     onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('Скопировано'); } catch { ta.select(); toast('Выделите и скопируйте текст'); } },

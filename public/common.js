@@ -103,7 +103,11 @@ function tabs(el, list, onChange) {
 function statusOf(st, collection, studentId) {
   const ps = st.payments.filter(p => p.collection_id === collection.id && p.student_id === studentId);
   const conf = ps.filter(p => p.status === 'confirmed');
-  if (conf.length) return { s: 'paid', amount: conf.reduce((a, p) => a + p.amount, 0), list: ps };
+  if (conf.length) {
+    const amount = conf.reduce((a, p) => a + p.amount, 0);
+    if (collection.amount && amount < collection.amount) return { s: 'partial', amount, debt: collection.amount - amount, pending: ps.some(p => p.status === 'pending'), list: ps };
+    return { s: 'paid', amount, list: ps };
+  }
   if (ps.some(p => p.status === 'pending')) return { s: 'pending', list: ps };
   return { s: 'none', list: ps };
 }
