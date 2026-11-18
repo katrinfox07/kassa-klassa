@@ -533,21 +533,20 @@ function backupCard() {
         y.error ? h('p.small', { style: 'color:var(--bad)' }, '⚠ Последняя попытка не удалась: ' + y.error)
           : y.last ? h('p.small.muted', 'Последняя копия: ' + fmt(y.last)) : null,
         h('div.row',
-          h('button.btn', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { login: y.login })), 'Копия отправлена') }, 'Отправить сейчас'),
+          h('button.btn', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { resend: true })), 'Копия отправлена') }, 'Отправить сейчас'),
           h('button.linklike', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { off: true })), 'Отключено') }, 'отключить')));
       return;
     }
-    const login = h('input', { value: y.login || '', placeholder: 'например: ivanova.kate', autocomplete: 'off' });
-    const pass = h('input', { type: 'password', placeholder: 'пароль приложения из 16 букв', autocomplete: 'new-password' });
+    const token = h('input', { placeholder: 'вставьте токен', autocomplete: 'off' });
     box.replaceChildren(
       h('p.small', 'Подключите Яндекс.Диск – и каждую ночь туда будет сохраняться копия: сборы, оплаты, расходы, чеки и скриншоты.'),
+      y.error ? h('p.small', { style: 'color:var(--bad)' }, '⚠ ' + y.error) : null,
       h('ol.small.muted', { style: 'margin:4px 0 8px;padding-left:18px' },
-        h('li', 'Откройте ', h('a', { href: 'https://id.yandex.ru/security/app-passwords', target: '_blank', rel: 'noopener' }, 'Яндекс ID → Пароли приложений'), '.'),
-        h('li', 'Создайте пароль для «Файлы» (WebDAV) и скопируйте его.'),
-        h('li', 'Вставьте сюда свой логин Яндекса и этот пароль.')),
-      h('label.field', 'Логин Яндекса', login),
-      h('label.field', 'Пароль приложения', pass),
-      h('button.btn.primary', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { login: login.value, pass: pass.value })), 'Подключено, первая копия на Диске') }, 'Подключить'));
+        h('li', 'Откройте ', h('a', { href: 'https://oauth.yandex.ru/authorize?response_type=token&client_id=f53cfda9e2ad4769863f72f63b959a3f', target: '_blank', rel: 'noopener' }, 'страницу Яндекса'), ' и войдите в свой аккаунт.'),
+        h('li', 'Нажмите «Разрешить» – Яндекс покажет токен (длинная строка).'),
+        h('li', 'Скопируйте его и вставьте сюда.')),
+      h('label.field', 'Токен Яндекс.Диска', token),
+      h('button.btn.primary', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { token: token.value })), 'Подключено, первая копия на Диске') }, 'Подключить'));
   };
   api('GET', '/api/admin/yadisk').then(render).catch(() => render({}));
   return h('section.card.form', h('h3', 'Резервная копия'), box,
