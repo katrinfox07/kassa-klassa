@@ -311,9 +311,10 @@ function scheduleEditor(info) {
     return t ? t.lessons.split('\n').map(x => x.trim()).map(x => /^[—-]+$/.test(x) ? '' : x) : [];
   });
   const times = (info.bells || []).map(b => b.from && b.to ? `${b.from}–${b.to}` : '');
+  const afters = (info.bells || []).map(b => b.after || '');
   let rows = Math.max(6, times.length, ...grid.map(g => g.length));
   const sync = () => {
-    info.bells = Array.from({ length: rows }, (_, i) => { const m = /(\d{1,2}[:.]\d{2})\D+(\d{1,2}[:.]\d{2})/.exec(times[i] || ''); const f = x => x.replace('.', ':').padStart(5, '0'); return m ? { from: f(m[1]), to: f(m[2]) } : { from: '', to: '' }; });
+    info.bells = Array.from({ length: rows }, (_, i) => { const m = /(\d{1,2}[:.]\d{2})\D+(\d{1,2}[:.]\d{2})/.exec(times[i] || ''); const f = x => x.replace('.', ':').padStart(5, '0'); return m ? { from: f(m[1]), to: f(m[2]), after: afters[i] || '' } : { from: '', to: '' }; });
     while (info.bells.length && !info.bells[info.bells.length - 1].from) info.bells.pop();
     info.timetable = DAYS.map((d, j) => { const l = Array.from({ length: rows }, (_, i) => grid[j][i] || ''); while (l.length && !l[l.length - 1]) l.pop(); return { day: d, lessons: l.map(x => x || '—').join('\n') }; }).filter(d => d.lessons);
   };

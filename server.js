@@ -158,6 +158,17 @@ if (!getSettingRaw('mig_5g_open_list')) {
   if (row) { const v = JSON.parse(row.value || '{}'); v.listCode = ''; q("UPDATE class_settings SET value=? WHERE class_id=? AND key='class'").run(JSON.stringify(v), cl.id); }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_open_list', '1')").run();
 }
+// 5Г: после 4 урока — столовая, перекус (со слов казначея)
+if (!getSettingRaw('mig_5g_lunch')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
+  if (row) {
+    const info = JSON.parse(row.value);
+    const b4 = (info.bells || []).find(b => Number(b.n) === 4) || (info.bells || [])[3];
+    if (b4) { b4.after = 'столовая, перекус'; q("UPDATE class_settings SET value=? WHERE class_id=? AND key='info'").run(JSON.stringify(info), cl.id); }
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_lunch', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -587,7 +598,7 @@ route('PUT', '/admin/info', (req, res, b, p, u, c) => {
   const arr = (v, n = 100) => Array.isArray(v) ? v.slice(0, n) : [];
   setSetting(c.id, 'info', {
     announcements: arr(b.announcements, 30).map(a => ({ date: isDate(a.date) ? a.date : '', text: str(a.text, 3000) })).filter(a => a.text),
-    bells: arr(b.bells, 12).map((x, i) => ({ n: i + 1, from: str(x.from, 5), to: str(x.to, 5) })).filter(x => x.from || x.to),
+    bells: arr(b.bells, 12).map((x, i) => ({ n: i + 1, from: str(x.from, 5), to: str(x.to, 5), after: str(x.after, 60) })).filter(x => x.from || x.to),
     holidays: arr(b.holidays).map(h => ({ title: str(h.title, 100), from: isDate(h.from) ? h.from : '', to: isDate(h.to) ? h.to : '' })).filter(h => h.title),
     teachers: arr(b.teachers).map(t => ({ role: str(t.role, 100), name: str(t.name, 150), contact: str(t.contact, 150) })).filter(t => t.name),
     timetable: arr(b.timetable, 7).map(d => ({ day: str(d.day, 30), lessons: str(d.lessons, 1000) })).filter(d => d.day || d.lessons),

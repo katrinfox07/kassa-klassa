@@ -183,7 +183,7 @@ function scheduleCard(info) {
         const len = toM(nb.from) - toM(b.to);
         const bl = todayOn && mins >= toM(b.to) && mins < toM(nb.from);
         if (len > 0) rows.push(h('div.brk' + (bl ? '.live' : ''), h('span'), h('span.lt', `${b.to}–${nb.from}`),
-          h('span', `перемена ${len} мин`), bl ? h('span.pill.ok', 'сейчас') : h('span')));
+          h('span', `перемена ${len} мин`, b.after ? h('b', ' · 🍽 ' + b.after) : null), bl ? h('span.pill.ok', 'сейчас') : h('span')));
       }
     }
     list.replaceChildren(...rows);
