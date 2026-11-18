@@ -47,7 +47,7 @@ function collectionCard(c) {
     h('div.meta', c.amount ? `${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
     c.description ? h('p.pre', { style: 'margin-top:8px' }, c.description) : null,
     progress(c),
-    h('div.row.between.small', h('span', `Сдали ${paid} из ${S.students.length}`), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
+    h('div.row.between.small', h('span', `Сдали полностью ${paid} из ${S.students.length}`, (n => n ? h('span.muted', ` · частично ${n}`) : null)(kids.filter(k => k.st.s === 'partial').length)), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
     !c.closed ? h('div.row', { style: 'margin-top:12px' }, h('button.btn.primary.grow', { onclick: () => payDialog(c) }, 'Оплатить')) : null,
     h('details.more', h('summary', 'Кто сдал'),
       h('ul.kids', kids.map(({ s, st }) => h('li.' + st.s,
