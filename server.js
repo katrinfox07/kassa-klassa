@@ -113,6 +113,7 @@ if (!getSettingRaw('mig_5g_holidays')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_holidays', '1')").run();
 }
+db.exec("UPDATE expenses SET note='' WHERE note LIKE 'Точная сумма:%'");
 // убрать служебную пометку после переноса из таблицы
 db.exec(`UPDATE collections SET description = trim(replace(replace(description, ' Перенесено из таблицы.', ''), 'Перенесено из таблицы.', '')) WHERE description LIKE '%Перенесено из таблицы.%'`);
 // Строка из таблицы: «ФИО ребёнка [tab] дата рождения [tab] ФИО родителя» (или через пробелы)
