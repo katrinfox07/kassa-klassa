@@ -374,3 +374,9 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .edit-row { gap: 4px; margin-bottom: 4px; }
 .edit-row input, .edit-row textarea { min-height: 0; height: 32px; padding: 4px 8px; font-size: 13.5px; }
 .edit-row textarea { height: 56px; }
+
+.kids li .paid-sum { font-size: 12.5px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.kids li.paid .paid-sum { color: var(--ok); }
+.kids li.none .paid-sum, .kids li.partial .paid-sum { color: var(--bad); }
+.kids li.pending .paid-sum { color: var(--warn); }
+.kids li .debt { background: var(--bad); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 11.5px; }
