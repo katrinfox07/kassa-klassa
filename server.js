@@ -573,8 +573,8 @@ function sendManifest(res, { name, short, start, id }) {
   res.end(JSON.stringify({
     name, short_name: short, start_url: start, id: id || start, scope: '/', display: 'standalone', lang: 'ru',
     background_color: '#f5f6f8', theme_color: '#2f6fde',
-    icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
+    icons: [{ src: '/icon-192.png?v=2', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png?v=2', sizes: '512x512', type: 'image/png' },
+      { src: '/icon-maskable.png?v=2', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
   }));
 }
 const SIGNUP_OPEN = process.env.SIGNUP === 'open'; // пока сервис закрыт: без регистрации и рекламы на главной
