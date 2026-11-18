@@ -246,8 +246,8 @@ VIEWS['класс'] = () => {
             h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'),
             h('button.icon-btn', { 'aria-label': 'Удалить', onclick: () => confirmInline(() => {}, `Удалить «${s.name}» из списка?`, async () => { await api('DELETE', '/api/admin/students/' + s.id); load(); }) }, '🗑'))));
       }))))),
-    h('section.card.form', h('h3', 'Добавить детей'), ta,
-      h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Добавлено') }, 'Добавить')));
+    h('section.card.form', h('h3', 'Добавить детей или дополнить данные'), h('p.hint', 'Вставьте список из таблицы. Если ребёнок уже есть в списке, его дата рождения и родитель просто допишутся, дубля не будет.'), ta,
+      h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Сохранено') }, 'Сохранить')));
 };
 
 // ---------- Информация ----------

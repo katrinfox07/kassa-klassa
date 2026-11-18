@@ -305,9 +305,16 @@ route('GET', '/admin/shot/:id', (req, res, b, p, u, c) => {
 route('POST', '/admin/students', (req, res, b, p, u, c) => {
   const names = String(b.names || '').split('\n').map(parseStudent).filter(Boolean);
   if (!names.length) bad('Введите имя');
-  if (q('SELECT COUNT(*) n FROM students WHERE class_id=?').get(c.id).n + names.length > 80) bad('Слишком много учеников');
+  if (q('SELECT COUNT(*) n FROM students WHERE class_id=?').get(c.id).n + names.length > 140) bad('Слишком много учеников');
   const max = q('SELECT COALESCE(MAX(sort),0) m FROM students WHERE class_id=?').get(c.id).m;
-  names.forEach((st, i) => insStudent(c.id, st, max + i + 1));
+  // если ребёнок с такими фамилией и именем уже есть, дополняем его данные, а не создаём дубль
+  let n = 0;
+  names.forEach(st => {
+    const ex = q('SELECT id FROM students WHERE class_id=? AND lower(name)=lower(?)').get(c.id, st.name);
+    if (ex) q(`UPDATE students SET full_name=?, birth=CASE WHEN ?<>'' THEN ? ELSE birth END,
+      parent=CASE WHEN ?<>'' THEN ? ELSE parent END WHERE id=?`).run(st.full, st.birth, st.birth, st.parent, st.parent, ex.id);
+    else insStudent(c.id, st, max + ++n);
+  });
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/students/:id', (req, res, b, p, u, c) => {
