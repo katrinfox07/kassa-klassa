@@ -125,6 +125,11 @@ function renderInfo(info) {
       h('table.bells', h('tbody', info.bells.map(b => h('tr', { class: mins >= toM(b.from) && mins < toM(b.to) && now.getDay() % 6 ? 'now' : '' },
         h('td.muted', b.n + ' урок'), h('td', `${b.from} – ${b.to}`)))))));
   }
+  if (info.timetable?.length) {
+    const wd = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][new Date().getDay()];
+    wrap.append(h('section.card', h('h3', 'Расписание уроков'), h('div.timetable', info.timetable.map(d =>
+      h('div.tt-day', { class: d.day.trim().toLowerCase() === wd ? 'today' : '' }, h('b', d.day), h('ol', d.lessons.split('\n').map(x => x.trim()).filter(Boolean).map(x => h('li', x))))))));
+  }
   if (info.holidays?.length) wrap.append(h('section.card', h('h3', 'Каникулы и выходные'),
     h('ul.plain', info.holidays.map(x => h('li', h('b', x.title), h('span.muted', ' ' + (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' – ' + fdate(x.to) : '')))))));
   if (info.teachers?.length) wrap.append(h('section.card', h('h3', 'Учителя'),

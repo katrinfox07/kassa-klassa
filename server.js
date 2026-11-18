@@ -273,6 +273,53 @@ route('POST', '/api/classes', (req, res, b, p, u) => {
   send(res, 200, { ok: true, slug });
 }, { auth: true });
 
+// --- Разовый перенос данных (включается переменной IMPORT_TOKEN, потом убирается) ---
+const IMPORT_TOKEN = process.env.IMPORT_TOKEN || '';
+route('POST', '/api/_import', (req, res, b) => {
+  const cors = { 'Access-Control-Allow-Origin': 'https://docs.google.com' };
+  const t = Buffer.from(String(b.token || '')), k = Buffer.from(IMPORT_TOKEN);
+  if (!IMPORT_TOKEN || t.length !== k.length || !crypto.timingSafeEqual(t, k)) return send(res, 404, { error: 'Не найдено' }, cors);
+  if (b.action === 'list') return send(res, 200, { classes: q(`SELECT c.slug, c.title, c.created_at,
+    (SELECT COUNT(*) FROM students s WHERE s.class_id=c.id) kids FROM classes c ORDER BY c.id`).all() }, cors);
+  const c = q('SELECT * FROM classes WHERE slug=?').get(str(b.slug, 60));
+  if (!c) return send(res, 400, { error: 'Нет класса' }, cors);
+  const out = {};
+  if (Array.isArray(b.students)) {
+    let max = q('SELECT COALESCE(MAX(sort),0) m FROM students WHERE class_id=?').get(c.id).m, n = 0;
+    for (const line of b.students) {
+      const st = parseStudent(line); if (!st) continue;
+      const ex = q('SELECT id FROM students WHERE class_id=? AND lower(name)=lower(?)').get(c.id, st.name);
+      if (ex) q('UPDATE students SET full_name=?, birth=?, parent=? WHERE id=?').run(st.full, st.birth, st.parent, ex.id);
+      else { insStudent(c.id, st, ++max); n++; }
+    }
+    out.studentsAdded = n;
+  }
+  if (b.info) { setSetting(c.id, 'info', { ...getSetting(c.id, 'info', DEFAULT_INFO), ...b.info }); out.info = true; }
+  if (b.collection) {
+    const k = b.collection;
+    const r = q('INSERT INTO collections(title, description, amount, due_date, pay_link, class_id) VALUES(?,?,?,?,?,?)')
+      .run(str(k.title, 200), str(k.description, 2000), int(k.amount) || 0, null, '', c.id);
+    let n = 0, miss = [];
+    for (const p of k.payments || []) {
+      const s = q('SELECT id FROM students WHERE class_id=? AND lower(name)=lower(?)').get(c.id, str(p.name, 120));
+      if (!s) { miss.push(p.name); continue; }
+      if (!(int(p.amount) > 0)) continue;
+      q("INSERT INTO payments(class_id, collection_id, student_id, amount, status, source, note, decided_at) VALUES(?,?,?,?,'confirmed','treasurer',?,datetime('now'))")
+        .run(c.id, r.lastInsertRowid, s.id, int(p.amount), str(p.note, 300)); n++;
+    }
+    out.payments = n; out.missing = miss;
+  }
+  if (b.expense) {
+    const e = b.expense;
+    const files = (Array.isArray(e.images) ? e.images.slice(0, 6) : []).map(i => saveImage(i, 'chek'));
+    const r = q('INSERT INTO expenses(class_id, title, amount, date, collection_id, note) VALUES(?,?,?,?,?,?)')
+      .run(c.id, str(e.title, 200), int(e.amount), isDate(e.date) ? e.date : today(), e.collection ? (q('SELECT id FROM collections WHERE class_id=? AND title=?').get(c.id, e.collection)?.id ?? null) : null, str(e.note, 1000));
+    files.forEach(f => q('INSERT INTO receipts(expense_id, file) VALUES(?,?)').run(r.lastInsertRowid, f));
+    out.expense = r.lastInsertRowid; out.files = files.length;
+  }
+  send(res, 200, { ok: true, ...out }, cors);
+});
+
 // --- Публичная страница класса ---
 route('GET', '/public', (req, res, b, p, u, c) => send(res, 200, classState(c, false)), { cls: true });
 route('POST', '/report-payment', async (req, res, b, p, u, c) => {
@@ -401,6 +448,7 @@ route('PUT', '/admin/info', (req, res, b, p, u, c) => {
     bells: arr(b.bells, 12).map((x, i) => ({ n: i + 1, from: str(x.from, 5), to: str(x.to, 5) })).filter(x => x.from || x.to),
     holidays: arr(b.holidays).map(h => ({ title: str(h.title, 100), from: isDate(h.from) ? h.from : '', to: isDate(h.to) ? h.to : '' })).filter(h => h.title),
     teachers: arr(b.teachers).map(t => ({ role: str(t.role, 100), name: str(t.name, 150), contact: str(t.contact, 150) })).filter(t => t.name),
+    timetable: arr(b.timetable, 7).map(d => ({ day: str(d.day, 30), lessons: str(d.lessons, 1000) })).filter(d => d.day || d.lessons),
     links: arr(b.links, 20).map(l => ({ title: str(l.title, 100), url: /^https:\/\//i.test(l.url || '') ? str(l.url, 1000) : '' })).filter(l => l.title && l.url),
   });
   send(res, 200, { ok: true });

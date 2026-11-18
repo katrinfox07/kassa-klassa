@@ -252,7 +252,7 @@ VIEWS['класс'] = () => {
 
 // ---------- Информация ----------
 VIEWS['инфо'] = () => {
-  const info = structuredClone(S.info);
+  const info = structuredClone(S.info); info.timetable ||= [];
   const save = act(() => api('PUT', '/api/admin/info', info), 'Сохранено');
   const listEditor = (title, key, fields, empty, cls = '') => {
     const rows = h('div');
@@ -274,6 +274,7 @@ VIEWS['инфо'] = () => {
   const body = h('div.stack',
     h('p.hint', 'Всё, что здесь заполнено, видно на странице для родителей во вкладке «Информация». После правок нажмите «Сохранить» внизу.'),
     ann,
+    listEditor('Расписание уроков', 'timetable', [['day', 'День недели'], ['lessons', 'Уроки, по одному на строку', 'textarea']], { day: '', lessons: '' }),
     listEditor('Расписание звонков', 'bells', [['from', 'Начало, 08:00', 'time'], ['to', 'Конец, 08:40', 'time']], { from: '', to: '' }),
     listEditor('Каникулы и выходные', 'holidays', [['title', 'Название'], ['from', 'С', 'date'], ['to', 'По', 'date']], { title: '', from: '', to: '' }, '.three'),
     listEditor('Учителя', 'teachers', [['role', 'Предмет или роль'], ['name', 'ФИО'], ['contact', 'Телефон / почта (необяз.)']], { role: '', name: '', contact: '' }, '.three'),
@@ -300,14 +301,7 @@ VIEWS['настройки'] = () => {
     h('section.card.form', h('h3', 'Ссылка для родителей'),
       h('p.hint', 'Отправьте её в чат класса. Родителям не нужно регистрироваться.'),
       h('div.row', h('input.grow', { value: classUrl(), readonly: true, onclick: e => e.target.select() }),
-        h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl()); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))),
-    h('section.card.form', h('h3', 'Удалить класс'),
-      h('p.hint', 'Удалятся все сборы, оплаты, чеки и список класса. Отменить нельзя. Сначала скачайте копию.'),
-      h('button.btn.danger', { onclick: () => {
-        const inp = h('input', { placeholder: S.class.slug });
-        modal('Удалить класс?', h('div.form', h('p', 'Чтобы подтвердить, введите адрес класса: ', h('b', S.class.slug)), inp,
-          h('button.btn.danger', { onclick: async () => { try { await api('DELETE', '/api/admin/class', { confirm: inp.value }); location.href = '/account'; } catch (e) { toast(e.message, true); } } }, 'Удалить навсегда')));
-      } }, 'Удалить класс')));
+        h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl()); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))));
 };
 
 start();
