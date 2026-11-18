@@ -215,7 +215,7 @@ function expenseDialog() {
     title: h('input', { required: true, maxlength: 200, placeholder: 'Например: Сладкие подарки, 29 шт.' }),
     amount: h('input', { type: 'number', inputmode: 'decimal', min: 1, required: true }),
     date: h('input', { type: 'date', value: today() }),
-    collection_id: h('select', h('option', { value: '' }, '— общая касса —'), S.collections.map(c => h('option', { value: c.id }, c.title))),
+    collection_id: h('select', h('option', { value: '' }, 'Касса класса'), S.collections.filter(c => c.separate).map(c => h('option', { value: c.id }, 'Досбор: ' + c.title))),
     note: h('textarea', { placeholder: 'Где купили, комментарий (необязательно)' }),
   };
   const files = h('input', { type: 'file', accept: 'image/*', multiple: true });
