@@ -154,13 +154,19 @@ const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 function installButton() {
   if (isStandalone()) return null;
   const b = h('button.btn.small.install-btn', {
-    hidden: !installEvt && !isIOS(),
+    hidden: false,
     onclick: async () => {
       if (installEvt) { installEvt.prompt(); await installEvt.userChoice; installEvt = null; b.hidden = true; return; }
-      modal('Установить приложение', h('div.steps',
-        h('div.step', h('div', 'Нажмите кнопку ', h('b', '«Поделиться»'), ' внизу экрана Safari (квадрат со стрелкой).')),
-        h('div.step', h('div', 'Выберите ', h('b', '«На экран Домой»'), '.')),
-        h('div.step', h('div', 'Нажмите ', h('b', '«Добавить»'), '. Иконка «Касса класса» появится на экране.'))));
+      const step = (...x) => h('div.step', h('div', ...x));
+      const ua = navigator.userAgent;
+      const steps = isIOS()
+        ? [step('Нажмите кнопку ', h('b', '«Поделиться»'), ' в Safari (квадрат со стрелкой).'), step('Выберите ', h('b', '«На экран Домой»'), '.'), step('Нажмите ', h('b', '«Добавить»'), '.')]
+        : /android/i.test(ua)
+          ? [step('Откройте меню браузера ', h('b', '⋮'), ' (три точки справа вверху).'), step('Выберите ', h('b', '«Добавить на главный экран»'), ' или ', h('b', '«Установить приложение»'), '.'), step('Подтвердите. Иконка появится на экране телефона.')]
+          : /edg\//i.test(ua)
+            ? [step('Откройте меню браузера ', h('b', '⋯'), ' (справа вверху).'), step('Выберите ', h('b', '«Приложения» → «Установить этот сайт как приложение»'), '.'), step('Нажмите ', h('b', '«Установить»'), '.')]
+            : [step('Нажмите значок установки в адресной строке или откройте меню браузера ', h('b', '⋮'), '.'), step('Выберите ', h('b', '«Установить приложение»'), '.')];
+      modal('Установить приложение', h('div.steps', ...steps, h('p.hint', 'Удобнее всего установить на телефон: откройте эту страницу на телефоне.')));
     },
   }, '📲 Установить');
   return b;
