@@ -127,7 +127,7 @@ function rosterView() {
           h('div.kid-parent', parentRows(s))))));
       return;
     }
-    if (!S.class.hasList) { box.replaceChildren(h('h3', 'Список класса'), h('ol.classlist', S.students.map(s => h('li', s.name)))); return; }
+    if (!S.class.hasList) { box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Загружаем…')); api('POST', '/api/roster', {}).then(r => { ROSTER = r.students; draw(); }).catch(e => toast(e.message, true)); return; }
     const inp = h('input', { inputmode: 'numeric', placeholder: 'Код класса', autocomplete: 'off', style: 'max-width:180px' });
     const go = async code => {
       try { ROSTER = (await api('POST', '/api/roster', { code })).students; try { localStorage.setItem('roster-' + SLUG, code); } catch { } draw(); }

@@ -275,7 +275,7 @@ VIEWS['класс'] = () => {
   const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя — по одному на строку (можно вставить из таблицы)' });
   const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
   return h('div.stack',
-    h('section.card', h('p.hint', 'Родители видят этот список во вкладке «Список класса» после ввода кода класса: ', h('b', S.class.listCode || '—'), '. Код можно поменять в «Настройках». Чтобы поправить данные, нажмите на ребёнка.'),
+    h('section.card', h('p.hint', 'Родители видят этот список во вкладке «Список класса»' + (S.class.listCode ? ` после ввода кода ${S.class.listCode}` : '') + '. Чтобы поправить данные, нажмите на ребёнка.'),
       h('div.kidlist', S.students.map((s, i) => {
         return h('div.kid' + (s.active ? '' : '.out'), { onclick: () => editKid(s, save), role: 'button', tabindex: 0 },
           h('div.kid-n', i + 1),
@@ -377,7 +377,7 @@ VIEWS['настройки'] = () => {
     h('section.card.form', h('h3', 'Класс'),
       h('label.field', 'Название (заголовок страницы)', f.title),
       h('label.field', 'Казначей', f.treasurer),
-      h('label.field', 'Код для списка класса (родители вводят его, чтобы увидеть ФИО, даты рождения и телефоны)', f.listCode),
+      h('label.field', 'Код для списка класса (необязательно; пусто — список открыт всем родителям)', f.listCode),
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
       h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]))), 'Сохранено') }, 'Сохранить')),

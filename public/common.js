@@ -168,14 +168,25 @@ function scheduleCard(info) {
     const lessons = days.length ? days[cur].lessons.split('\n').map(x => x.trim()) : [];
     while (lessons.length && !lessons[lessons.length - 1]) lessons.pop();
     const n = days.length ? lessons.length : bells.length;
-    list.replaceChildren(...Array.from({ length: n }, (_, i) => {
+    const todayOn = days.length ? isToday : now.getDay() % 6;
+    const isEmpty = i => days.length && (!lessons[i] || /^[—-]+$/.test(lessons[i]));
+    const rows = [];
+    for (let i = 0; i < n; i++) {
       const b = bells[i] || {}, subj = days.length ? lessons[i] : '';
-      const empty = days.length && (!subj || /^[—-]+$/.test(subj));
-      const live = (days.length ? isToday : now.getDay() % 6) && b.from && mins >= toM(b.from) && mins < toM(b.to);
-      return h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : ''),
+      const empty = isEmpty(i);
+      const live = todayOn && b.from && mins >= toM(b.from) && mins < toM(b.to);
+      rows.push(h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : ''),
         h('span.ln', i + 1), h('span.lt', b.from ? `${b.from}–${b.to}` : ''),
-        h('span.ls', days.length ? (empty ? 'нет урока' : subj) : ''), live ? h('span.pill.blue', 'идёт') : h('span'));
-    }));
+        h('span.ls', days.length ? (empty ? 'нет урока' : subj) : ''), live ? h('span.pill.blue', 'идёт') : h('span')));
+      const nb = bells[i + 1];
+      if (i < n - 1 && b.to && nb?.from && !empty && !isEmpty(i + 1)) {
+        const len = toM(nb.from) - toM(b.to);
+        const bl = todayOn && mins >= toM(b.to) && mins < toM(nb.from);
+        if (len > 0) rows.push(h('div.brk' + (bl ? '.live' : ''), h('span'), h('span.lt', `${b.to}–${nb.from}`),
+          h('span', `перемена ${len} мин`), bl ? h('span.pill.ok', 'сейчас') : h('span')));
+      }
+    }
+    list.replaceChildren(...rows);
   };
   draw();
   return h('section.card', h('h3', '📅 Расписание из электронного журнала'), days.length ? chips : null, list);

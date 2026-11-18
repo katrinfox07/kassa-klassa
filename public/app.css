@@ -534,3 +534,6 @@ div.field .linklike { justify-self: start; }
 .classlist { margin: 6px 0 0; padding-left: 28px; columns: 2 220px; column-gap: 24px; }
 .classlist li { padding: 5px 0; border-bottom: 1px dashed var(--line); break-inside: avoid; }
 .classlist li::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
+.brk { display: grid; grid-template-columns: 26px 92px 1fr auto; align-items: center; gap: 10px; padding: 1px 10px; font-size: 12px; color: var(--muted); }
+.brk.live { background: var(--ok-soft); color: var(--ok); font-weight: 700; border-radius: 9px; padding: 4px 10px; }
+@media (max-width: 420px) { .brk { grid-template-columns: 24px 78px 1fr auto; gap: 8px; } }

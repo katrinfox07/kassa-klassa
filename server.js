@@ -151,6 +151,13 @@ if (!getSettingRaw('mig_list_code')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_list_code', '1')").run();
 }
+// 5Г: список класса открыт родителям без кода (решение казначея)
+if (!getSettingRaw('mig_5g_open_list')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='class'").get(cl.id);
+  if (row) { const v = JSON.parse(row.value || '{}'); v.listCode = ''; q("UPDATE class_settings SET value=? WHERE class_id=? AND key='class'").run(JSON.stringify(v), cl.id); }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_open_list', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -386,7 +393,7 @@ route('GET', '/public', (req, res, b, p, u, c) => send(res, 200, classState(c, f
 route('POST', '/roster', (req, res, b, p, u, c) => {
   rate(req, 'roster', 20, 600e3);
   const code = getSetting(c.id, 'class', {}).listCode || '';
-  if (!code || str(b.code, 40).toLowerCase() !== code.toLowerCase()) bad('Неверный код. Спросите его у казначея в чате класса.');
+  if (code && str(b.code, 40).toLowerCase() !== code.toLowerCase()) bad('Неверный код. Спросите его у казначея в чате класса.');
   send(res, 200, { students: q('SELECT name, full_name, birth, parent, phone FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id) });
 }, { cls: true });
 route('POST', '/report-payment', async (req, res, b, p, u, c) => {
