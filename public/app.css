@@ -260,3 +260,50 @@ header.top.hero a { color: #fff; }
 .tbl td.phones { min-width: 190px; }
 .tbl td .calls { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .tbl td .calls a { text-decoration: none; white-space: nowrap; }
+
+/* Список класса у казначея */
+.kidlist { display: grid; gap: 6px; }
+.kid { display: grid; grid-template-columns: 28px minmax(0, 1.1fr) minmax(0, 1.3fr) 24px; gap: 4px 12px; align-items: start; padding: 10px 12px; border-radius: 14px; background: var(--bg); cursor: pointer; }
+.kid:hover { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+.kid.out { opacity: .55; }
+.kid-n { color: var(--muted); font-size: 13px; padding-top: 2px; }
+.kid-name { font-weight: 700; }
+.kid-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.kid-parent { font-size: 14px; }
+.kid .calls { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+.kid .call { font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.kid-edit { color: var(--muted); text-align: right; }
+@media (max-width: 640px) { .kid { grid-template-columns: 24px minmax(0, 1fr) 20px; } .kid-parent { grid-column: 2; } .kid-edit { grid-row: 1; grid-column: 3; } }
+
+/* ===== Компактнее по всему сайту ===== */
+body { font-size: 15px; line-height: 1.4; }
+.wrap { max-width: 960px; padding-bottom: 48px; }
+header.top { padding: 12px 0 6px; }
+header.top.hero { margin-top: 10px; padding: 16px 18px 48px; border-radius: 22px; }
+header.top.hero h1 { font-size: 22px; }
+.totals { margin: -32px 10px 12px; gap: 8px; }
+.total { padding: 9px 12px; border-radius: 14px; }
+.total .value { font-size: 18px; margin-top: 2px; }
+.tabs { margin-bottom: 8px; padding-top: 4px; padding-bottom: 4px; }
+.tab { padding: 7px 13px; font-size: 14px; }
+.card { padding: 12px 14px; border-radius: 16px; }
+.card h3 { margin-bottom: 6px; font-size: 16px; }
+.stack { gap: 8px; }
+.form { gap: 9px; }
+.btn { min-height: 38px; padding: 7px 14px; border-radius: 11px; }
+.btn.small { min-height: 30px; padding: 4px 10px; font-size: 13px; }
+input, select, textarea { min-height: 38px; padding: 7px 10px; border-radius: 10px; }
+textarea { min-height: 64px; }
+.coll .title { font-size: 16px; }
+.coll { padding-left: 18px; }
+.coll::before { top: 12px; bottom: 12px; width: 5px; }
+.progress { height: 9px; }
+.empty { padding: 18px 8px; }
+.kid { padding: 7px 10px; border-radius: 11px; }
+.kidlist { gap: 4px; }
+.bells td { padding: 5px 10px; }
+.tt-day { padding: 8px 10px; }
+.teachers { gap: 6px; } .teachers li { padding: 7px 10px; }
+.thumbs img, .thumbs button { width: 60px; height: 60px; }
+details.more > summary { margin-top: 6px; }
+@media (max-width: 480px) { .totals { margin: -32px 2px 12px; gap: 5px; } .total .value { font-size: 15px; } }

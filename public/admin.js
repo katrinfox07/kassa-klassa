@@ -245,23 +245,33 @@ VIEWS['класс'] = () => {
   const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя — по одному на строку (можно вставить из таблицы)' });
   const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
   return h('div.stack',
-    h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Выбывших лучше отмечать, а не удалять: так сохранится история оплат.'),
-      h('div.tbl-scroll', h('table.tbl',
-        h('thead', h('tr', h('th', '№'), h('th', 'ФИО ребёнка'), h('th', 'Дата рождения'), h('th', 'Родитель'), h('th', 'Телефон'), h('th', ''))),
-        h('tbody', S.students.map((s, i) => {
-        const full = h('input', { value: s.full_name || s.name, maxlength: 160, onchange: act(() => save(s, { full_name: full.value }), 'Сохранено') });
-        const birth = h('input', { value: s.birth || '', maxlength: 20, placeholder: 'дд.мм.гггг', style: 'width:8.5em', onchange: act(() => save(s, { birth: birth.value }), 'Сохранено') });
-        const parent = h('input', { value: s.parent || '', maxlength: 200, onchange: act(() => save(s, { parent: parent.value }), 'Сохранено') });
-        const phone = h('input', { value: s.phone || '', maxlength: 200, type: 'tel', placeholder: '8-900-000-00-00', onchange: act(() => save(s, { phone: phone.value }), 'Сохранено') });
-        const calls = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean).map(x => h('a.small', { href: 'tel:' + x.replace(/[^\d+]/g, '') }, '📞 ' + x));
-        return h('tr', { class: s.active ? '' : 'out' }, h('td.muted.small', i + 1), h('td', full), h('td', birth), h('td', parent),
-          h('td.phones', phone, calls.length ? h('div.calls', calls) : null),
-          h('td', h('div.actions',
-            h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'))));
-      }))))),
+    h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Чтобы поправить данные, нажмите на ребёнка.'),
+      h('div.kidlist', S.students.map((s, i) => {
+        const calls = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean).map(x => h('a.call', { href: 'tel:' + x.replace(/[^\d+]/g, ''), onclick: e => e.stopPropagation() }, '📞 ' + x));
+        return h('div.kid' + (s.active ? '' : '.out'), { onclick: () => editKid(s, save), role: 'button', tabindex: 0 },
+          h('div.kid-n', i + 1),
+          h('div.kid-main', h('div.kid-name', s.full_name || s.name, s.active ? null : h('span.pill', { style: 'margin-left:6px' }, 'выбыл')),
+            h('div.kid-meta', s.birth ? '🎂 ' + s.birth : 'дата рождения не указана')),
+          h('div.kid-parent', s.parent ? h('div', s.parent) : h('div.muted', 'родитель не указан'), calls.length ? h('div.calls', calls) : null),
+          h('div.kid-edit', '✎'));
+      }))),
     h('section.card.form', h('h3', 'Добавить детей или дополнить данные'), h('p.hint', 'Вставьте список из таблицы. Если ребёнок уже есть в списке, его дата рождения и родитель просто допишутся, дубля не будет.'), ta,
       h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Сохранено') }, 'Сохранить')));
 };
+
+function editKid(s, save) {
+  const f = {
+    full: h('input', { value: s.full_name || s.name, maxlength: 160 }),
+    birth: h('input', { value: s.birth || '', maxlength: 20, placeholder: 'дд.мм.гггг' }),
+    parent: h('textarea', { rows: 2, maxlength: 200 }, s.parent || ''),
+    phone: h('input', { value: s.phone || '', maxlength: 200, type: 'tel', placeholder: '8-900-000-00-00, через запятую' }),
+  };
+  const close = modal('Данные ребёнка', h('form.form', {
+    onsubmit: async e => { e.preventDefault(); await act(() => save(s, { full_name: f.full.value, birth: f.birth.value, parent: f.parent.value, phone: f.phone.value }), 'Сохранено')(); close(); },
+  }, h('label.field', 'ФИО ребёнка', f.full), h('label.field', 'Дата рождения', f.birth), h('label.field', 'Родители', f.parent), h('label.field', 'Телефоны', f.phone),
+    h('button.btn.primary', { type: 'submit' }, 'Сохранить'),
+    h('button.linklike', { type: 'button', onclick: async () => { await act(() => save(s, { active: !s.active }))(); close(); } }, s.active ? 'Отметить, что ребёнок выбыл из класса' : 'Вернуть в класс')));
+}
 
 // ---------- Информация ----------
 VIEWS['инфо'] = () => {
