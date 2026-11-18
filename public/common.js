@@ -265,3 +265,24 @@ new MutationObserver(() => document.querySelectorAll('input[type=file]:not([data
   .observe(document.documentElement, { childList: true, subtree: true });
 // не даём браузеру открыть файл, если промахнулись мимо поля
 ['dragover', 'drop'].forEach(t => window.addEventListener(t, e => { if (!e.target.closest?.('.dropzone')) e.preventDefault(); }));
+
+// ---------- Банки сборов ----------
+const BANKS = [
+  { re: /(^|\.)(sberbank|sber)\.(ru|com)$|(^|\.)sber\.ru$/, name: 'Сбер', color: '#21A038', note: 'для клиентов Сбера' },
+  { re: /(^|\.)vtb\.ru$/, name: 'ВТБ', color: '#0A2896', note: 'из любого банка по СБП' },
+  { re: /(^|\.)(tbank|tinkoff)\.ru$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'из любого банка по СБП' },
+  { re: /(^|\.)alfabank\.ru$|(^|\.)alfa\.me$/, name: 'Альфа-Банк', color: '#EF3124', note: 'из любого банка по СБП' },
+  { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF' },
+  { re: /(^|\.)gazprombank\.ru$/, name: 'Газпромбанк', color: '#0F2D69' },
+  { re: /(^|\.)yoomoney\.ru$/, name: 'ЮMoney', color: '#8B3FFD' },
+];
+function bankOf(url) {
+  let host = '';
+  try { host = new URL(url).hostname.replace(/^www\./, ''); } catch { }
+  const b = BANKS.find(x => x.re.test(host));
+  return b ? { ...b, url } : { name: host || 'Банк', color: '#6b7280', url };
+}
+function payLinks(c) { return String(c.pay_link || '').split(/\s+/).filter(Boolean).map(bankOf); }
+function bankIcon(b) {
+  return h('span.bankic', { style: `background:${b.color};color:${b.ink || '#fff'}` }, b.name.replace(/^Т-/, 'Т').slice(0, 1));
+}

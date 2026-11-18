@@ -57,15 +57,19 @@ function shotBtn(p) {
 VIEWS['проверить'] = () => {
   const list = S.payments.filter(p => p.status === 'pending');
   const wrap = h('div.stack');
-  wrap.append(h('p.hint', 'Здесь отметки родителей «Я оплатил». Сверьте с уведомлением из банка или списком участников сбора и подтвердите.'));
+  wrap.append(pushCard());
+  wrap.append(h('div.row', { style: 'gap:8px' },
+    h('button.btn.grow', { onclick: reconcileDialog }, '🏦 Сверить с банком'),
+    list.length > 1 ? h('button.btn.ok.grow', { onclick: () => confirmAll(list) }, `✓ Подтвердить все (${list.length})`) : null));
   if (!list.length) wrap.append(h('p.empty', 'Новых отметок нет 👍'));
-  list.forEach(p => wrap.append(h('section.card.pending-item',
-    h('div.row.between', h('div.grow', h('b', sName(p.student_id)), h('div.muted.small', cTitle(p.collection_id))), h('b', rub(p.amount))),
-    h('div.small.muted', { style: 'margin:4px 0 10px' }, fdatetime(p.created_at), p.payer ? ' · платил(а): ' + p.payer : '', p.note ? ' · ' + p.note : ''),
-    h('div.row',
-      h('button.btn.ok.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + p.id, { status: 'confirmed' }), 'Подтверждено') }, '✓ Подтвердить'),
-      h('button.btn.small.danger', { onclick: act(() => api('PUT', '/api/admin/payments/' + p.id, { status: 'rejected' }), 'Отклонено') }, 'Не нашла перевод'),
-      shotBtn(p)))));
+  list.forEach(p => wrap.append(h('section.card.pending-item.pend-row',
+    p.has_shot ? h('img.pend-shot', { src: apiUrl('/api/admin/shot/' + p.id), alt: 'Скриншот', loading: 'lazy', onclick: () => viewImage(apiUrl('/api/admin/shot/' + p.id)) }) : h('div.pend-shot.none', '🧾'),
+    h('div.grow',
+      h('div.row.between', h('b', sName(p.student_id)), h('b', rub(p.amount))),
+      h('div.muted.small', cTitle(p.collection_id), ' · ', fdatetime(p.created_at), p.payer ? ' · ' + p.payer : '', p.note ? ' · ' + p.note : ''),
+      h('div.row.nowrap', { style: 'margin-top:6px' },
+        h('button.btn.ok.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + p.id, { status: 'confirmed' }), 'Подтверждено') }, '✓ Подтвердить'),
+        h('button.btn.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + p.id, { status: 'rejected' }), 'Отклонено') }, 'Нет перевода'))))));
   const recent = S.payments.filter(p => p.status !== 'pending').slice(0, 15);
   if (recent.length) wrap.append(h('section.card', h('h3', 'Последние решения'),
     h('div.tbl-scroll', h('table.tbl', h('tbody', recent.map(p => h('tr',
@@ -93,7 +97,7 @@ function collectionAdminCard(c) {
     h('summary', 'Таблица оплат'), collectionTable(c));
   return h('section.card.coll' + (c.closed ? '.closed' : ''),
     h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), c.closed ? h('span.pill.ok', '✓ закрыт') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
-    h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
+    h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату'), c.pay_link ? h('span.bankchips', { style: 'margin-left:8px' }, payLinks(c).map(b => h('a', { href: b.url, target: '_blank', rel: 'noopener', title: b.name }, bankIcon(b)))) : null),
     progress(c),
     h('div.row.between.small', h('span', `Сдали ${paid} из ${active.length}`,
       (n => n ? h('span.pill.bad.debtpill', { style: 'margin-left:6px' }, n + ' с долгом') : null)(active.filter(s => statusOf(S, c, s.id).s === 'partial').length), c.pending ? h('span.pill.warn', { style: 'margin-left:6px' }, c.pending + ' на проверке') : null),
@@ -102,7 +106,7 @@ function collectionAdminCard(c) {
       h('button.btn.small', { onclick: () => collectionDialog(c) }, 'Изменить'),
       h('button.btn.small', { onclick: () => remind(c) }, 'Текст для чата'),
       h('button.btn.small', { onclick: act(() => api('PUT', '/api/admin/collections/' + c.id, { ...c, closed: !c.closed }), c.closed ? 'Сбор снова открыт' : 'Сбор закрыт') }, c.closed ? '↺ Открыть снова' : '✓ Закрыть сбор'),
-      c.pay_link ? h('a.btn.small', { href: c.pay_link, target: '_blank', rel: 'noopener' }, 'Ссылка сбора ↗') : null),
+      null),
     det);
 }
 
@@ -148,15 +152,26 @@ function collectionDialog(c) {
     title: h('input', { value: c.title, required: true, maxlength: 150, placeholder: 'Например: Подарки к Новому году' }),
     amount: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: c.amount, placeholder: '0 — если сумма свободная' }),
     due_date: h('input', { type: 'date', value: c.due_date || '' }),
-    pay_link: h('input', { type: 'url', value: c.pay_link, placeholder: 'https://…' }),
     description: h('textarea', { placeholder: 'На что собираем, подробности' }, c.description),
     closed: h('input', { type: 'checkbox', checked: !!c.closed }),
     separate: h('select', h('option', { value: '1', selected: !!c.separate }, 'Досбор — на конкретное дело (кино, фото, подарок)'), h('option', { value: '', selected: !c.separate }, 'Взнос в кассу класса')),
   };
+  const links = h('div');
+  const addLink = v => {
+    const chip = h('span');
+    const inp = h('input', { type: 'url', value: v || '', placeholder: 'https://… ссылка на сбор' });
+    const upd = () => chip.replaceChildren(inp.value.trim() ? bankIcon(bankOf(inp.value.trim())) : h('span.bankic', { style: 'background:var(--line)' }, '?'));
+    inp.addEventListener('input', upd); upd();
+    const row = h('div.linkrow', chip, inp, h('button.icon-btn', { type: 'button', 'aria-label': 'Убрать', onclick: () => row.remove() }, '✕'));
+    links.append(row);
+  };
+  const cur = String(c.pay_link || '').split(/\s+/).filter(Boolean);
+  (cur.length ? cur : ['']).forEach(addLink);
   const close = modal(isNew ? 'Новый сбор' : 'Изменить сбор', h('form.form', {
     onsubmit: async e => {
       e.preventDefault();
       const body = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]));
+      body.pay_link = [...links.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean).join('\n');
       try { await api(isNew ? 'POST' : 'PUT', '/api/admin/collections' + (isNew ? '' : '/' + c.id), body); close(); toast('Сохранено'); load(); }
       catch (err) { toast(err.message, true); }
     },
@@ -164,8 +179,9 @@ function collectionDialog(c) {
     h('label.field', 'Тип сбора', f.separate),
     h('label.field', 'Название', f.title),
     h('div.two', h('label.field', 'С каждого ребёнка, ₽', f.amount), h('label.field', 'Сдать до', f.due_date)),
-    h('label.field', 'Ссылка на банковский сбор', f.pay_link,
-      h('span.hint', 'Создайте сбор в приложении своего банка и вставьте сюда ссылку на него. По ней родители перейдут к оплате.')),
+    h('div.field', h('span', 'Ссылки на сбор в банках'), links,
+      h('button.linklike', { type: 'button', onclick: () => addLink('') }, '+ ещё банк'),
+      h('span.hint', 'Создайте сбор в приложении банка и вставьте ссылку. Можно в нескольких банках: у родителей появится выбор со значками банков.')),
     h('label.field', 'Описание', f.description),
     !isNew ? h('label.check', f.closed, 'Сбор закрыт (кнопка оплаты у родителей скроется)') : null,
     h('div.row.between',
@@ -189,7 +205,7 @@ function remind(c) {
   const debts = S.students.filter(s => s.active).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
   const url = classUrl();
   const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount ? ` — ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
-    (c.pay_link ? `Оплатить: ${c.pay_link}\n` : '') + `После оплаты отметьтесь, пожалуйста, на странице класса: ${url}\n` +
+    payLinks(c).map(b => `Оплатить (${b.name}${b.note ? ', ' + b.note : ''}): ${b.url}\n`).join('') + `После оплаты отметьтесь, пожалуйста, на странице класса: ${url}\n` +
     (notPaid.length && notPaid.length < S.students.length ? `\nПока не сдали: ${notPaid.join(', ')}.` : '') +
     (debts.length ? `\nНужно доплатить: ${debts.join(', ')}.` : '');
   const ta = h('textarea', { rows: 9 }, text);
@@ -202,7 +218,7 @@ function remind(c) {
 VIEWS['расходы'] = () => {
   const wrap = h('div.stack', h('div.row', h('button.btn.primary', { onclick: expenseDialog }, '+ Добавить расход с чеком')));
   if (!S.expenses.length) wrap.append(h('p.empty', 'Расходов пока нет.'));
-  if (S.expenses.length) wrap.append(h('section.card', h('div.explist', S.expenses.map(e => expRow(e, e.collection_id ? cTitle(e.collection_id) : '',
+  if (S.expenses.length) wrap.append(h('section.card', h('div.explist', S.expenses.map(e => expRow(e, S.collections.find(c => c.id === e.collection_id && c.separate)?.title || '',
     h('button.icon-btn', { 'aria-label': 'Ещё', title: 'Ещё', onclick: () => {
       const close = modal(e.title, h('div.form', h('p.muted', fdate(e.date) + ' · ' + rub(e.amount)),
         h('button.linklike.danger-text', { onclick: () => confirmInline(close, `Удалить расход «${e.title}» вместе с чеками? Вернуть будет нельзя.`, async () => { await api('DELETE', '/api/admin/expenses/' + e.id); toast('Удалено'); load(); }) }, 'Удалить этот расход')));
@@ -369,3 +385,131 @@ VIEWS['настройки'] = () => {
 };
 
 start();
+
+
+function confirmAll(list) {
+  const close = modal('Подтвердить все?', h('div.form',
+    h('p', `Отметить как оплаченные ${list.length} шт. на ${rub(list.reduce((a, p) => a + p.amount, 0))}? Проверьте, что все переводы пришли.`),
+    h('div.row', h('button.btn.ok', { onclick: async () => { close(); await act(() => Promise.all(list.map(p => api('PUT', '/api/admin/payments/' + p.id, { status: 'confirmed' }))), 'Подтверждено')(); } }, '✓ Да, подтвердить'),
+      h('button.btn', { onclick: () => close() }, 'Отмена'))));
+}
+
+// ---------- Уведомления на телефон ----------
+function pushCard() {
+  const box = h('section.card.push-card');
+  const urlB64 = k => { const b = atob(k.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((k.length + 3) % 4)); return Uint8Array.from(b, ch => ch.charCodeAt(0)); };
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const render = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      box.replaceChildren(h('b', '🔔 Уведомления об оплатах'), h('p.small.muted', isIOS
+        ? 'На iPhone сначала добавьте сайт на экран «Домой» (Поделиться → На экран «Домой»), откройте его оттуда и включите уведомления здесь.'
+        : 'Этот браузер не умеет присылать уведомления. Откройте кабинет в Chrome, Edge или Safari.'));
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') {
+      box.replaceChildren(h('div.row.between', h('span', '🔔 Уведомления об оплатах ', h('b', 'включены'), h('span.muted.small', ' на этом устройстве')),
+        h('button.linklike', { onclick: async () => { await api('POST', '/api/admin/push/off', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); render(); } }, 'выключить')));
+      return;
+    }
+    box.replaceChildren(h('div.row.between', h('div.grow', h('b', '🔔 Сразу узнавать об оплатах'), h('div.small.muted', 'На телефон: «Иванов Петя — 5 000 ₽, 01:32»')),
+      h('button.btn.primary.small', { onclick: async e => {
+        e.target.disabled = true;
+        try {
+          if (await Notification.requestPermission() !== 'granted') throw new Error('Уведомления запрещены в настройках браузера');
+          const { key } = await api('GET', '/api/admin/push');
+          const s2 = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64(key) });
+          await api('POST', '/api/admin/push', { ...s2.toJSON(), test: true });
+          toast('Готово! Пришлём пробное уведомление');
+        } catch (err) { toast(err.message, true); }
+        render();
+      } }, 'Включить')));
+  };
+  render().catch(() => {});
+  return box;
+}
+
+// ---------- Сверка с банком ----------
+const nrm = t => String(t || '').toLowerCase().replace(/ё/g, 'е');
+const escRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function kidPatterns(s) {
+  const pats = [];
+  String(s.parent || '').split(/[,;\n]/).map(x => nrm(x).trim().split(/\s+/)).filter(x => x.length >= 2).forEach(([fam, im, ot]) => {
+    if (ot) pats.push([new RegExp(`${escRe(im)}\\s+${escRe(ot)}\\s+${escRe(fam[0])}\\.?(?![а-я])`), 3]);
+    pats.push([new RegExp(`${escRe(fam)}\\s+${escRe(im)}`), 3], [new RegExp(`${escRe(im)}\\s+${escRe(fam)}`), 3]);
+    pats.push([new RegExp(`(^|[^а-я])${escRe(im)}\\s+${escRe(fam[0])}\\.`), 2]);
+  });
+  const [kf, ki] = nrm(s.name).split(/\s+/);
+  if (ki) pats.push([new RegExp(`${escRe(kf)}\\s+${escRe(ki)}|${escRe(ki)}\\s+${escRe(kf)}`), 3]);
+  if (kf && kf.length > 3) pats.push([new RegExp(`(^|[^а-я])${escRe(kf.slice(0, -1))}`), 1]);
+  return pats;
+}
+function parseBank(text) {
+  const lines = String(text).split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const AMT = /([+]?\s?\d{1,3}(?:[\s  ]\d{3})+|[+]?\d{3,7})(?:[.,](\d{2}))?\s*(?:₽|руб|р\.|rub)/i;
+  const out = []; let start = 0;
+  lines.forEach((ln, i) => {
+    const m = ln.match(AMT); if (!m) return;
+    if (/^-|−|списан|оплата товаров/i.test(ln.trim()) && !/^\+/.test(m[1].trim())) { start = i + 1; return; }
+    out.push({ amount: Math.round(Number(m[1].replace(/[^\d]/g, '')) + (m[2] ? Number(m[2]) / 100 : 0)), text: lines.slice(start, i + 1).join(' · '), extra: lines[i + 1] || '' });
+    start = i + 1;
+  });
+  return out;
+}
+function matchKid(rec, kids) {
+  const tryText = t => {
+    const scored = kids.map(s => ({ s, sc: Math.max(0, ...s._p.filter(([re]) => re.test(nrm(t))).map(([, w]) => w)) })).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+    if (!scored.length) return null;
+    if (scored.length > 1 && scored[0].sc === scored[1].sc) return null;
+    return scored[0].s;
+  };
+  return tryText(rec.text) || tryText(rec.extra);
+}
+function reconcileDialog() {
+  const open = S.collections.filter(c => !c.closed);
+  if (!open.length) { toast('Нет открытых сборов', true); return; }
+  const sel = h('select', open.map(c => h('option', { value: c.id }, c.title + (c.amount ? ` · ${rub(c.amount)}` : ''))));
+  const ta = h('textarea', { rows: 8, placeholder: 'Скопируйте сюда список участников сбора или историю поступлений из приложения банка.\nНапример:\nАнна Сергеевна И.  +5 000 ₽\nОльга Петровна С.  +5 000 ₽' });
+  const res = h('div');
+  const run = () => {
+    const c = open.find(x => x.id === Number(sel.value));
+    const kids = S.students.filter(s => s.active).map(s => Object.assign(s, { _p: kidPatterns(s) }));
+    const recs = parseBank(ta.value);
+    if (!recs.length) { res.replaceChildren(h('p.small.muted', 'Не нашла сумм. Скопируйте строки, где есть имя и сумма в ₽.')); return; }
+    const rows = recs.map(r => {
+      const kid = matchKid(r, kids);
+      const pick = h('select.small', h('option', { value: '' }, '— не учитывать —'), kids.map(s => h('option', { value: s.id, selected: kid?.id === s.id }, s.name)));
+      const info = h('span.small');
+      const upd = () => {
+        const s = kids.find(k => k.id === Number(pick.value));
+        if (!s) { info.textContent = kid ? '' : 'не узнала — выберите ребёнка'; info.className = 'small muted'; return; }
+        const st = statusOf(S, c, s.id);
+        info.className = 'small ' + (st.s === 'paid' ? 'muted' : 'ok-text');
+        info.textContent = st.s === 'paid' ? 'уже отмечено' : st.s === 'pending' ? 'есть отметка родителя → подтвердить' : st.s === 'partial' ? 'доплата' : 'отметить оплату';
+      };
+      pick.addEventListener('change', upd); upd();
+      return { r, pick, el: h('div.recon-row', h('div.recon-head', h('span.small.recon-text', r.text), h('b', rub(r.amount))), h('div.row', pick, info)) };
+    });
+    const go = h('button.btn.ok.block', { onclick: async () => {
+      const todo = rows.map(x => ({ x, s: Number(x.pick.value) })).filter(y => y.s && statusOf(S, c, y.s).s !== 'paid');
+      if (!todo.length) { toast('Нечего отмечать'); return; }
+      go.disabled = true;
+      try {
+        for (const { x, s } of todo) {
+          const pend = S.payments.find(p => p.collection_id === c.id && p.student_id === s && p.status === 'pending');
+          if (pend) await api('PUT', '/api/admin/payments/' + pend.id, { status: 'confirmed', amount: x.r.amount });
+          else await api('POST', '/api/admin/payments', { collection_id: c.id, student_id: s, amount: x.r.amount, note: 'сверка с банком: ' + x.r.text.slice(0, 200) });
+        }
+        close(); toast(`Отмечено: ${todo.length}`); load();
+      } catch (e) { toast(e.message, true); go.disabled = false; }
+    } }, 'Отметить оплаты');
+    const found = rows.filter(x => x.pick.value).length;
+    res.replaceChildren(h('p.small', `Нашла переводов: ${recs.length}, узнала детей: ${found}. Проверьте и поправьте, где нужно.`), ...rows.map(x => x.el), go);
+  };
+  const close = modal('Сверка с банком', h('div.form',
+    h('label.field', 'Сбор', sel),
+    h('label.field', 'Переводы из банка', ta),
+    h('span.hint', 'Узнаю детей по ФИО родителей из «Списка класса» (например «Анна Сергеевна И.») или по фамилии ребёнка в комментарии к переводу.'),
+    h('button.btn.primary', { onclick: run }, 'Найти, кто заплатил'), res), { wide: true });
+}

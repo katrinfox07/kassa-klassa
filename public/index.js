@@ -91,8 +91,9 @@ load();
     h('div.step', h('div',
       h('b', 'Переведите деньги'),
       c.pay_link
-        ? [h('p.small.muted', 'Откроется страница сбора в банке.'),
-           h('a.btn.primary.block', { href: c.pay_link, target: '_blank', rel: 'noopener' }, `Перейти к оплате${c.amount ? ' ' + rub(c.amount) : ''}`)]
+        ? [h('p.small.muted', (payLinks(c).length > 1 ? 'Выберите банк, откроется страница сбора' : 'Откроется страница сбора в банке') + (c.amount ? ` · ${rub(c.amount)}` : '') + '.'),
+           h('div.banks', payLinks(c).map(b => h('a.bankbtn', { href: b.url, target: '_blank', rel: 'noopener' },
+             bankIcon(b), h('span', h('b', b.name), b.note ? h('span.small', b.note) : null), h('span.go', 'Оплатить ↗'))))]
         : h('p.small.muted', 'Ссылка на оплату пока не добавлена.'),
       S.class.payHint ? h('p.small.pre', { style: 'margin-top:8px' }, S.class.payHint) : null)),
     h('div.step', h('div', h('b', 'Отметьте, что оплатили'), h('p.small.muted', 'Так казначей быстрее найдёт ваш перевод.'), form)));
@@ -101,7 +102,7 @@ load();
 
 function expensesView() {
   if (!S.expenses.length) return h('p.empty', 'Расходов пока нет.');
-  const byColl = id => S.collections.find(c => c.id === id)?.title;
+  const byColl = id => S.collections.find(c => c.id === id && c.separate)?.title;
   const total = S.expenses.reduce((a, e) => a + e.amount, 0);
   return h('section.card', h('div.row.between', h('h3', '🧾 Расходы'), h('span.muted.small', `${S.expenses.length} шт. · ${rub(total)}`)),
     h('div.explist', S.expenses.map(e => expRow(e, byColl(e.collection_id)))));

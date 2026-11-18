@@ -58,7 +58,7 @@ button, .btn { font: inherit; cursor: pointer; }
 .btn.block { width: 100%; }
 .btn:disabled { opacity: .5; cursor: default; }
 .icon-btn { border: 0; background: transparent; color: var(--muted); font-size: 18px; padding: 6px 10px; border-radius: 8px; }
-label.field { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+label.field, div.field { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
 input, select, textarea { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; min-height: 44px; }
 textarea { min-height: 80px; resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
@@ -462,3 +462,33 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .dz-previews:empty { display: none; }
 .dz-previews img { width: 56px; height: 56px; object-fit: cover; border-radius: 9px; box-shadow: var(--shadow); }
 .dropzone.has { border-style: solid; border-color: var(--ok); }
+
+/* Банки сборов */
+.bankic { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-weight: 800; font-size: 15px; flex: none; }
+.banks { display: grid; gap: 8px; margin-top: 8px; }
+.bankbtn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 14px; text-decoration: none; color: inherit; background: var(--card, #fff); transition: transform .12s, border-color .12s; }
+.bankbtn:hover { border-color: var(--accent, #6366f1); transform: translateY(-1px); }
+.bankbtn b { display: block; }
+.bankbtn .small { color: var(--muted); }
+.bankbtn .go { margin-left: auto; font-weight: 700; color: var(--accent, #6366f1); white-space: nowrap; }
+.bankchips { display: inline-flex; gap: 4px; vertical-align: middle; }
+.bankchips a { text-decoration: none; }
+.bankchips .bankic { width: 26px; height: 26px; font-size: 13px; }
+.linkrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.linkrow input { flex: 1; min-width: 0; }
+
+/* Проверка оплат */
+.pend-row { display: flex; gap: 12px; align-items: flex-start; }
+.pend-shot { width: 64px; height: 84px; object-fit: cover; border-radius: 10px; cursor: zoom-in; flex: none; border: 1px solid var(--line); }
+.pend-shot.none { display: grid; place-items: center; font-size: 26px; background: var(--bg); cursor: default; }
+.push-card { padding: 10px 14px; }
+.recon-row { border-top: 1px solid var(--line); padding: 8px 0; display: grid; gap: 4px; }
+.recon-row select { max-width: 60%; padding: 4px 8px; min-height: 32px; }
+.recon-text { color: var(--muted); overflow-wrap: anywhere; }
+.ok-text { color: var(--ok); font-weight: 700; }
+.row.nowrap { flex-wrap: nowrap; }
+.pend-row { padding: 10px 12px; }
+.pend-shot { width: 46px; height: 58px; }
+.pend-shot.none { font-size: 20px; }
+.recon-head { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; }
+div.field .linklike { justify-self: start; }

@@ -207,6 +207,7 @@ const rmFile = f => { if (f) fs.rm(path.join(UPLOAD_DIR, path.basename(f)), { fo
 const str = (v, max = 500) => String(v ?? '').trim().slice(0, max);
 const int = v => { const n = Math.round(Number(String(v ?? '').replace(',', '.').replace(/\s/g, ''))); return Number.isFinite(n) ? n : NaN; };
 const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+const okLinks = v => String(v || '').split(/[\s,]+/).filter(Boolean).slice(0, 6).map(okLink).join('\n');
 const okLink = v => { v = str(v, 1000); if (!v) return ''; if (!/^https:\/\//i.test(v)) bad('Ссылка должна начинаться с https://'); return v; };
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (d, n) => { const t = new Date((d > today() ? d : today()) + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -340,11 +341,69 @@ route('POST', '/report-payment', async (req, res, b, p, u, c) => {
   q('INSERT INTO payments(class_id, collection_id, student_id, amount, payer, note, screenshot) VALUES(?,?,?,?,?,?,?)')
     .run(c.id, k.id, s.id, amount, str(b.payer, 120), str(b.note, 300), shot);
   send(res, 200, { ok: true });
+  pushClass(c.id, { title: `💰 ${s.name} — ${amount.toLocaleString('ru-RU')} ₽`, body: k.title + (str(b.payer, 120) ? ' · платил(а): ' + str(b.payer, 120) : '') + (shot ? ' · есть скриншот' : ''),
+    ts: Date.now(), url: '/c/' + c.slug + '/admin#проверить' }).catch(() => {});
 }, { cls: true });
 
 // --- Кабинет казначея (только хозяин класса или владелец сервиса) ---
 const A = { cls: true, admin: true };
 const W = { cls: true, admin: true, write: true }; // запись: только при действующей подписке
+
+// --- Уведомления на телефон казначею (Web Push, без сторонних библиотек) ---
+db.exec(`CREATE TABLE IF NOT EXISTS push_subs (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+const b64u = buf => Buffer.from(buf).toString('base64url');
+const VAPID = (() => {
+  let jwk = getSettingRaw('vapid_jwk');
+  if (!jwk) {
+    const { privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    jwk = JSON.stringify(privateKey.export({ format: 'jwk' }));
+    q('INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)').run('vapid_jwk', jwk);
+  }
+  const j = JSON.parse(jwk);
+  return { key: crypto.createPrivateKey({ key: j, format: 'jwk' }),
+    pub: b64u(Buffer.concat([Buffer.from([4]), Buffer.from(j.x, 'base64url'), Buffer.from(j.y, 'base64url')])) };
+})();
+function vapidAuth(endpoint) {
+  const aud = new URL(endpoint).origin;
+  const head = b64u(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+  const body = b64u(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://www.kassa-klassa.ru' }));
+  const sig = crypto.sign('sha256', Buffer.from(head + '.' + body), { key: VAPID.key, dsaEncoding: 'ieee-p1363' });
+  return `vapid t=${head}.${body}.${b64u(sig)}, k=${VAPID.pub}`;
+}
+function encryptPush(sub, text) { // RFC 8291, aes128gcm
+  const ua = Buffer.from(sub.p256dh, 'base64url'), auth = Buffer.from(sub.auth, 'base64url');
+  const ecdh = crypto.createECDH('prime256v1'); ecdh.generateKeys();
+  const as = ecdh.getPublicKey(), shared = ecdh.computeSecret(ua), salt = crypto.randomBytes(16);
+  const ikm = Buffer.from(crypto.hkdfSync('sha256', shared, auth, Buffer.concat([Buffer.from('WebPush: info\0'), ua, as]), 32));
+  const cek = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16));
+  const nonce = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+  const ci = crypto.createCipheriv('aes-128-gcm', cek, nonce);
+  const enc = Buffer.concat([ci.update(Buffer.concat([Buffer.from(text), Buffer.from([2])])), ci.final(), ci.getAuthTag()]);
+  const rs = Buffer.alloc(4); rs.writeUInt32BE(4096);
+  return Buffer.concat([salt, rs, Buffer.from([as.length]), as, enc]);
+}
+async function pushClass(classId, data) {
+  const subs = q('SELECT * FROM push_subs WHERE class_id=?').all(classId);
+  await Promise.all(subs.map(async sub => {
+    try {
+      const r = await fetch(sub.endpoint, { method: 'POST', body: encryptPush(sub, JSON.stringify(data)),
+        headers: { 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high', Authorization: vapidAuth(sub.endpoint) } });
+      if (r.status === 404 || r.status === 410) q('DELETE FROM push_subs WHERE id=?').run(sub.id);
+      else if (!r.ok) console.warn('push', r.status, (await r.text()).slice(0, 200));
+    } catch (e) { console.warn('push error', e.message); }
+  }));
+}
+route('GET', '/admin/push', (req, res, b, p, u, c) => send(res, 200, { key: VAPID.pub, count: q('SELECT COUNT(*) n FROM push_subs WHERE class_id=?').get(c.id).n }), A);
+route('POST', '/admin/push', (req, res, b, p, u, c) => {
+  const ep = str(b.endpoint, 1000), k = b.keys || {};
+  if (!/^https:\/\//.test(ep) || !k.p256dh || !k.auth) bad('Неверная подписка');
+  q('INSERT INTO push_subs(class_id, endpoint, p256dh, auth) VALUES(?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET class_id=excluded.class_id, p256dh=excluded.p256dh, auth=excluded.auth')
+    .run(c.id, ep, str(k.p256dh, 200), str(k.auth, 100));
+  if (b.test) pushClass(c.id, { title: '🔔 Уведомления включены', body: 'Так будут приходить отметки родителей об оплате.', url: '/c/' + c.slug + '/admin#проверить' });
+  send(res, 200, { ok: true });
+}, A);
+route('POST', '/admin/push/off', (req, res, b, p, u, c) => { q('DELETE FROM push_subs WHERE endpoint=? AND class_id=?').run(str(b.endpoint, 1000), c.id); send(res, 200, { ok: true }); }, A);
 route('GET', '/admin/state', (req, res, b, p, u, c) => send(res, 200, classState(c, true)), A);
 route('GET', '/admin/shot/:id', (req, res, b, p, u, c) => {
   const r = q('SELECT screenshot FROM payments WHERE id=? AND class_id=?').get(int(p.id), c.id);
@@ -384,7 +443,7 @@ route('DELETE', '/admin/students/:id', (req, res, b, p, u, c) => {
 const collectionFields = b => {
   const title = str(b.title, 150); if (!title) bad('Введите название сбора');
   const amount = int(b.amount || 0); if (!(amount >= 0 && amount < 1e7)) bad('Неверная сумма');
-  return [title, str(b.description, 2000), amount, isDate(b.due_date) ? b.due_date : null, okLink(b.pay_link)];
+  return [title, str(b.description, 2000), amount, isDate(b.due_date) ? b.due_date : null, okLinks(b.pay_link)];
 };
 route('POST', '/admin/collections', (req, res, b, p, u, c) => {
   q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, class_id) VALUES(?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, c.id);
