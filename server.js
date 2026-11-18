@@ -635,6 +635,66 @@ route('DELETE', '/admin/class', (req, res, b, p, u, c) => {
   send(res, 200, { ok: true });
 }, A);
 
+// --- Ежедневная копия на Яндекс.Диск (WebDAV, пароль приложения Яндекса) ---
+const YD = process.env.YADISK_URL || 'https://webdav.yandex.ru';
+const localDay = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); // по Новосибирску
+async function ydReq(cfg, method, p, body, headers = {}) {
+  const r = await fetch(YD + p.split('/').map(encodeURIComponent).join('/'), { method, body,
+    headers: { Authorization: 'Basic ' + Buffer.from(cfg.login + ':' + cfg.pass).toString('base64'), ...headers } });
+  if (r.status === 401) throw new Error('Яндекс не принял логин или пароль приложения');
+  if (r.status === 507) throw new Error('На Яндекс.Диске закончилось место');
+  return r;
+}
+async function backupClass(c) {
+  const cfg = getSetting(c.id, 'yadisk', null);
+  if (!cfg?.login || !cfg?.pass) throw new Error('Яндекс.Диск не подключён');
+  const root = '/Касса класса', dir = `${root}/${c.slug}`, fdir = `${dir}/файлы`;
+  for (const d of [root, dir, fdir]) { const r = await ydReq(cfg, 'MKCOL', d); if (![201, 405, 409].includes(r.status)) throw new Error('Не удалось создать папку на Диске (' + r.status + ')'); }
+  const day = localDay();
+  const put = async (p, data, type) => { const r = await ydReq(cfg, 'PUT', p, data, { 'Content-Type': type }); if (!r.ok) throw new Error('Не удалось загрузить файл (' + r.status + ')'); };
+  await put(`${dir}/kassa-${c.slug}-${day}.json`, JSON.stringify(classState(c, true), null, 1), 'application/json');
+  // чеки, скриншоты оплат и QR – докачиваем только новые
+  const files = new Set([
+    ...q('SELECT screenshot f FROM payments WHERE class_id=? AND screenshot IS NOT NULL').all(c.id).map(r => r.f),
+    ...q('SELECT r.file f FROM receipts r JOIN expenses e ON e.id=r.expense_id WHERE e.class_id=?').all(c.id).map(r => r.f),
+    ...q("SELECT qr f FROM collections WHERE class_id=? AND qr != ''").all(c.id).map(r => r.f),
+  ].filter(Boolean).map(f => path.basename(f)));
+  const list = await (await ydReq(cfg, 'PROPFIND', fdir, null, { Depth: '1' })).text();
+  const have = new Set([...list.matchAll(/<d:displayname>([^<]*)<\/d:displayname>/gi)].map(m => m[1]));
+  let added = 0;
+  for (const f of files) {
+    if (have.has(f)) continue;
+    const fp = path.join(UPLOAD_DIR, f);
+    if (!fs.existsSync(fp)) continue;
+    await put(`${fdir}/${f}`, fs.readFileSync(fp), 'application/octet-stream'); added++;
+  }
+  setSetting(c.id, 'yadisk', { ...cfg, last: new Date().toISOString(), lastDay: day, error: '' });
+  return { day, added, files: files.size };
+}
+async function backupAll() {
+  if (new Date(Date.now() + 7 * 3600e3).getUTCHours() < 3) return; // после 3 ночи
+  for (const c of q("SELECT c.* FROM classes c JOIN class_settings s ON s.class_id=c.id AND s.key='yadisk'").all()) {
+    const cfg = getSetting(c.id, 'yadisk', {});
+    if (!cfg.login || cfg.lastDay === localDay()) continue;
+    try { await backupClass(c); } catch (e) { setSetting(c.id, 'yadisk', { ...cfg, error: e.message, lastDay: localDay() }); console.error('backup', c.slug, e.message); }
+  }
+}
+if (require.main === module) { setInterval(() => backupAll().catch(() => {}), 3600e3); setTimeout(() => backupAll().catch(() => {}), 60e3); }
+const ydPublic = c => { const y = getSetting(c.id, 'yadisk', {}); return { login: y.login || '', connected: !!(y.login && y.pass), last: y.last || '', error: y.error || '' }; };
+route('GET', '/admin/yadisk', (req, res, b, p, u, c) => send(res, 200, ydPublic(c)), A);
+route('POST', '/admin/yadisk', async (req, res, b, p, u, c) => {
+  if (b.off) { q("DELETE FROM class_settings WHERE class_id=? AND key='yadisk'").run(c.id); return send(res, 200, ydPublic(c)); }
+  const prev = getSetting(c.id, 'yadisk', {});
+  const login = str(b.login, 100).replace(/@yandex\.ru$/i, ''), pass = str(b.pass, 100).replace(/\s/g, '') || prev.pass;
+  if (!login || !pass) bad('Введите логин и пароль приложения');
+  setSetting(c.id, 'yadisk', { login, pass, last: prev.last || '' });
+  try { const r = await backupClass(c); send(res, 200, { ...ydPublic(c), result: r }); }
+  catch (e) {
+    if (prev.login) setSetting(c.id, 'yadisk', { ...prev, error: e.message }); else q("DELETE FROM class_settings WHERE class_id=? AND key='yadisk'").run(c.id);
+    bad(e.message);
+  }
+}, A);
+
 // --- Кабинет владельца сервиса ---
 const O = { auth: true, owner: true };
 route('GET', '/api/owner/classes', (req, res) => {

@@ -384,8 +384,7 @@ VIEWS['настройки'] = () => {
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
       h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]))), 'Сохранено') }, 'Сохранить')),
-    h('section.card', h('h3', 'Резервная копия'), h('p.hint', 'Скачайте все данные (сборы, оплаты, расходы) одним файлом.'),
-      h('a.btn', { href: apiUrl('/api/admin/export') }, 'Скачать копию')),
+    backupCard(),
     h('section.card.form', h('h3', 'Ссылка для родителей'),
       h('p.hint', 'Отправьте её в чат класса. Родителям не нужно регистрироваться.'),
       h('div.row', h('input.grow', { value: classUrl(), readonly: true, onclick: e => e.target.select() }),
@@ -520,4 +519,37 @@ function reconcileDialog() {
     h('label.field', 'Переводы из банка', ta),
     h('span.hint', 'Узнаю детей по ФИО родителей из «Списка класса» (например «Анна Сергеевна И.») или по фамилии ребёнка в комментарии к переводу.'),
     h('button.btn.primary', { onclick: run }, 'Найти, кто заплатил'), res), { wide: true });
+}
+
+
+// ---------- Резервная копия: файлом и каждый день на Яндекс.Диск ----------
+function backupCard() {
+  const box = h('div');
+  const fmt = iso => new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  const render = y => {
+    if (y.connected) {
+      box.replaceChildren(
+        h('p', '☁️ Каждую ночь копия уходит на Яндекс.Диск ', h('b', y.login), ' в папку «Касса класса».'),
+        y.error ? h('p.small', { style: 'color:var(--bad)' }, '⚠ Последняя попытка не удалась: ' + y.error)
+          : y.last ? h('p.small.muted', 'Последняя копия: ' + fmt(y.last)) : null,
+        h('div.row',
+          h('button.btn', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { login: y.login })), 'Копия отправлена') }, 'Отправить сейчас'),
+          h('button.linklike', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { off: true })), 'Отключено') }, 'отключить')));
+      return;
+    }
+    const login = h('input', { value: y.login || '', placeholder: 'например: ivanova.kate', autocomplete: 'off' });
+    const pass = h('input', { type: 'password', placeholder: 'пароль приложения из 16 букв', autocomplete: 'new-password' });
+    box.replaceChildren(
+      h('p.small', 'Подключите Яндекс.Диск – и каждую ночь туда будет сохраняться копия: сборы, оплаты, расходы, чеки и скриншоты.'),
+      h('ol.small.muted', { style: 'margin:4px 0 8px;padding-left:18px' },
+        h('li', 'Откройте ', h('a', { href: 'https://id.yandex.ru/security/app-passwords', target: '_blank', rel: 'noopener' }, 'Яндекс ID → Пароли приложений'), '.'),
+        h('li', 'Создайте пароль для «Файлы» (WebDAV) и скопируйте его.'),
+        h('li', 'Вставьте сюда свой логин Яндекса и этот пароль.')),
+      h('label.field', 'Логин Яндекса', login),
+      h('label.field', 'Пароль приложения', pass),
+      h('button.btn.primary', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { login: login.value, pass: pass.value })), 'Подключено, первая копия на Диске') }, 'Подключить'));
+  };
+  api('GET', '/api/admin/yadisk').then(render).catch(() => render({}));
+  return h('section.card.form', h('h3', 'Резервная копия'), box,
+    h('p.small.muted', 'Или ', h('a', { href: apiUrl('/api/admin/export') }, 'скачать копию файлом'), ' прямо сейчас.'));
 }
