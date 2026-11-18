@@ -51,11 +51,11 @@ function collectionCard(c) {
     !c.closed ? h('div.row', { style: 'margin-top:12px' }, h('button.btn.primary.grow', { onclick: () => payDialog(c) }, 'Оплатить')) : null,
     h('details.more', h('summary', 'Кто сдал'),
       h('ul.kids', kids.map(({ s, st }) => h('li.' + st.s,
-        h('span.ic', st.s === 'paid' ? '✓' : st.s === 'pending' ? '…' : st.s === 'partial' ? '!' : '✕'),
+        h('span.ic', st.s === 'paid' || st.s === 'partial' ? '✓' : st.s === 'pending' ? '…' : '✕'),
         h('span.name', s.name),
         h('span.paid-sum', st.s === 'paid' ? rub(st.amount) : st.s === 'partial' ? rub(st.amount) : st.s === 'pending' ? 'проверка' : '0 ₽'),
         st.s === 'partial' ? h('span.debt', 'долг ' + rub(st.debt)) : null))),
-      h('p.hint', { style: 'margin-top:8px' }, 'Рядом с именем — сколько оплачено. Зелёный — оплачено полностью, красный — не оплачено или есть долг, жёлтый — ждёт подтверждения.')));
+      h('p.hint', { style: 'margin-top:8px' }, 'Рядом с именем — сколько оплачено. Зелёный — оплачено, оранжевым — сколько осталось доплатить, красный — не оплачено, жёлтый — ждёт подтверждения.')));
 }
 
 function payDialog(c) {

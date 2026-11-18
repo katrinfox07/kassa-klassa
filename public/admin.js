@@ -96,7 +96,7 @@ function collectionAdminCard(c) {
     h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
     progress(c),
     h('div.row.between.small', h('span', `Сдали полностью ${paid} из ${active.length}`,
-      (n => n ? h('span.pill.bad', { style: 'margin-left:6px' }, n + ' с долгом') : null)(active.filter(s => statusOf(S, c, s.id).s === 'partial').length), c.pending ? h('span.pill.warn', { style: 'margin-left:6px' }, c.pending + ' на проверке') : null),
+      (n => n ? h('span.pill.bad.debtpill', { style: 'margin-left:6px' }, n + ' с долгом') : null)(active.filter(s => statusOf(S, c, s.id).s === 'partial').length), c.pending ? h('span.pill.warn', { style: 'margin-left:6px' }, c.pending + ' на проверке') : null),
       h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}${c.spent ? ' · потрачено ' + rub(c.spent) : ''}`)),
     h('div.row', { style: 'margin-top:10px' },
       h('button.btn.small', { onclick: () => collectionDialog(c) }, 'Изменить'),

@@ -429,3 +429,15 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .expmeta { color: var(--muted); font-size: 12.5px; }
 .expsum { font-weight: 800; color: var(--coral); white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px; }
 .exprow .icon-btn { padding: 2px 6px; }
+
+/* Частичная оплата: ребёнок зелёным, долг оранжевым */
+:root { --orange: #f07c1b; --orange-soft: #fff0e2; }
+@media (prefers-color-scheme: dark) { :root { --orange: #ffa25a; --orange-soft: #3b2a18; } }
+.kids li.partial { background: var(--ok-soft); }
+.kids li.partial .ic { background: var(--ok); }
+.kids li.partial .paid-sum { color: var(--ok); }
+.kids li .debt { background: var(--orange); }
+.pill.bad.debtpill { background: var(--orange-soft); color: var(--orange); }
+.tbl tr.debt td { background: var(--orange-soft); }
+.tbl tr.debt td:first-child { box-shadow: inset 4px 0 0 var(--orange); }
+.tbl tr.debt .pill.bad { background: var(--orange); color: #fff; }
