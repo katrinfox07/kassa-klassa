@@ -129,7 +129,7 @@ function collectionTable(c) {
       actions = [shotBtn(pend), h('button.btn.ok.small', { onclick: act(() => api('PUT', '/api/admin/payments/' + pend.id, { status: 'confirmed' })) }, '✓'),
         h('button.btn.small.danger', { onclick: act(() => api('PUT', '/api/admin/payments/' + pend.id, { status: 'rejected' })) }, '✕')];
     } else {
-      status = h('span.pill', 'не оплачено');
+      status = h('span.pill.bad', 'не оплачено');
       actions = [h('button.btn.small', { onclick: () => markPaid(c, s) }, 'Отметить оплату')];
     }
     return h('tr', { class: (s.active ? '' : 'out') + (st.s === 'partial' ? ' debt' : '') }, h('td', s.name), h('td', status), h('td', h('div.actions', actions)));
