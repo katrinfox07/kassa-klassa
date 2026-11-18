@@ -380,3 +380,31 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .kids li.none .paid-sum, .kids li.partial .paid-sum { color: var(--bad); }
 .kids li.pending .paid-sum { color: var(--warn); }
 .kids li .debt { background: var(--bad); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 11.5px; }
+
+/* ===== Анимации ===== */
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes grow { from { width: 0; } }
+@keyframes shine { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  header.top.hero { background-size: 200% 200%; animation: shine 8s ease-in-out infinite alternate; }
+  .total { animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+  .total:nth-child(2) { animation-delay: .08s; } .total:nth-child(3) { animation-delay: .16s; }
+  .total .label::before { animation: pop .5s .3s both; }
+  .total:hover .label::before { animation: wiggle .5s; }
+  main > *, #main > * , .stack > .card { animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
+  .stack > .card:nth-child(2) { animation-delay: .05s; } .stack > .card:nth-child(3) { animation-delay: .1s; }
+  .stack > .card:nth-child(4) { animation-delay: .15s; } .stack > .card:nth-child(n+5) { animation-delay: .2s; }
+  .progress > div { animation: grow 1.1s cubic-bezier(.2,.8,.2,1) both .15s; }
+  .kids li, .kid, .lesson { animation: rise .35s both; }
+  .kids li .ic { animation: pop .4s both .2s; }
+  .tab { transition: background .2s, color .2s, transform .15s; }
+  .tab:active, .btn:active, .daychip:active { transform: scale(.96); }
+  .daychip { transition: background .2s, color .2s, transform .15s; }
+  .daychip.on { animation: pop .3s both; }
+  .btn.primary { background-size: 200% 200%; transition: background-position .4s, transform .15s, filter .15s; }
+  .btn.primary:hover { background-position: 100% 50%; }
+  .lesson.live .pill { animation: wiggle 1.6s ease-in-out infinite; }
+  .modal { animation: rise .25s cubic-bezier(.2,.8,.2,1) both; }
+}

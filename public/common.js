@@ -192,3 +192,23 @@ function installButton() {
   }, '📲 Установить');
   return b;
 }
+
+// ---------- Анимация: цифры в итогах «набегают» при первом показе ----------
+(() => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let done = false;
+  const run = el => {
+    const target = Number(el.textContent.replace(/[^\d-]/g, '')) || 0, t0 = performance.now(), dur = 1100;
+    const step = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = rub(Math.round(target * e)); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  const start = () => {
+    const box = document.getElementById('totals'); if (!box) return;
+    new MutationObserver((_, obs) => {
+      const vals = box.querySelectorAll('.value'); if (!vals.length || done) return;
+      done = true; obs.disconnect(); vals.forEach(run);
+    }).observe(box, { childList: true });
+  };
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', start) : start();
+})();
