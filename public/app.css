@@ -501,3 +501,7 @@ div.field .linklike { justify-self: start; }
 .qrpay { margin-top: 10px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 10px 12px; }
 .qrpay summary { cursor: pointer; font-weight: 700; }
 .qrimg { display: block; width: min(240px, 100%); margin: 10px auto; border-radius: 10px; background: #fff; }
+.headteacher { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin: 6px 0 10px; border-radius: 16px; background: linear-gradient(135deg, var(--accent-soft), transparent); border: 1.5px solid var(--accent); }
+.ht-ic { font-size: 30px; }
+.ht-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.ht-name { font-size: 18px; font-weight: 800; }

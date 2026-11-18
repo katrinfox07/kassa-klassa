@@ -138,8 +138,15 @@ function renderInfo(info) {
           x.from && x.to ? h('span.muted.small', days(Math.round((D(x.to) - D(x.from)) / 864e5) + 1)) : null);
       }))));
   }
-  if (info.teachers?.length) wrap.append(h('section.card', h('h3', 'Учителя'),
-    h('ul.plain.teachers', info.teachers.map(t => h('li', h('div.muted.small', t.role), h('div', t.name), t.contact ? h('div.small', linkify(t.contact)) : null)))));
+  if (info.teachers?.length) {
+    const isHead = t => /классн\S*\s+рук/i.test(t.role || '');
+    const head = info.teachers.find(isHead), rest = info.teachers.filter(t => t !== head);
+    const subj = t => (t.role || '').replace(/[;,]?\s*классн\S*\s+руководитель/i, '').trim();
+    wrap.append(h('section.card', h('h3', 'Учителя'),
+      head ? h('div.headteacher', h('span.ht-ic', '👩‍🏫'), h('div', h('div.ht-label', 'Классный руководитель'), h('div.ht-name', head.name),
+        subj(head) ? h('div.muted.small', subj(head)) : null, head.contact ? h('div.small', linkify(head.contact)) : null)) : null,
+      h('ul.plain.teachers', rest.map(t => h('li', h('div.muted.small', t.role), h('div', t.name), t.contact ? h('div.small', linkify(t.contact)) : null)))));
+  }
   if (info.links?.length) wrap.append(h('section.card', h('h3', 'Полезные ссылки'),
     h('ul.plain', info.links.map(l => h('li', h('a', { href: l.url, target: '_blank', rel: 'noopener' }, l.title))))));
   if (!wrap.children.length) wrap.append(h('p.empty', 'Информация пока не добавлена.'));

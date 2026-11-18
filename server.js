@@ -121,6 +121,17 @@ if (!getSettingRaw('mig_5g_ozon_only')) {
   if (k) q('UPDATE collections SET pay_link=? WHERE id=?').run('https://finance.ozon.ru/apps/sbp/ozonbankpay/7ddcbd0b-e5b6-4953-a318-7070a275bace', k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon_only', '1')").run();
 }
+// 5Г: убрать почту классного руководителя (просьба казначея)
+if (!getSettingRaw('mig_5g_noemail')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
+  if (row) {
+    const info = JSON.parse(row.value);
+    (info.teachers || []).forEach(t => { if (/olesin\.2011@mail\.ru/i.test(t.contact || '')) t.contact = ''; });
+    q("UPDATE class_settings SET value=? WHERE class_id=? AND key='info'").run(JSON.stringify(info), cl.id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_noemail', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
