@@ -530,3 +530,4 @@ div.field .linklike { justify-self: start; }
 .ht-name { font-size: inherit; font-weight: 700; }
 /* строки с долгом без подсветки — достаточно оранжевой плашки */
 .tbl tr.debt td, .tbl tr.debt td:first-child, .tbl tr.debt td:last-child { background: none; box-shadow: none; border-radius: 0; font-weight: inherit; }
+.tbl tr.debt .pill.bad { background: var(--orange-soft); color: var(--orange); }
