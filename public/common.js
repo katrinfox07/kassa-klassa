@@ -143,7 +143,7 @@ function renderInfo(info) {
     const head = info.teachers.find(isHead), rest = info.teachers.filter(t => t !== head);
     const subj = t => (t.role || '').replace(/[;,]?\s*классн\S*\s+руководитель/i, '').trim();
     wrap.append(h('section.card', h('h3', 'Учителя'),
-      head ? h('div.headteacher', h('span.ht-ic', '👩‍🏫'), h('div', h('div.ht-label', 'Классный руководитель'), h('div.ht-name', head.name),
+      head ? h('div.headteacher', h('div', h('div.ht-label', 'Классный руководитель'), h('div.ht-name', head.name),
         subj(head) ? h('div.muted.small', subj(head)) : null, head.contact ? h('div.small', linkify(head.contact)) : null)) : null,
       h('ul.plain.teachers', rest.map(t => h('li', h('div.muted.small', t.role), h('div', t.name), t.contact ? h('div.small', linkify(t.contact)) : null)))));
   }

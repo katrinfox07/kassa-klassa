@@ -525,3 +525,6 @@ div.field .linklike { justify-self: start; }
 @media (prefers-reduced-motion: reduce) { .bb-ic { animation: none; } }
 @media (prefers-color-scheme: dark) { .bday-banner { background: linear-gradient(135deg, #3a2f12, var(--card)); } }
 .bday-banner { margin-bottom: 12px; }
+.headteacher { display: block; padding: 6px 0 8px; margin: 0 0 4px; border: 0; border-radius: 0; background: none; border-bottom: 1px dashed var(--line); }
+.ht-label { font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 700; }
+.ht-name { font-size: inherit; font-weight: 700; }
