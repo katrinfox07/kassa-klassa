@@ -123,8 +123,21 @@ function renderInfo(info) {
   if (info.announcements?.length) wrap.append(h('section.card', h('h3', 'Объявления'),
     info.announcements.map(a => h('div.announce', a.date ? h('div.muted.small', fdate(a.date)) : null, h('p.pre', a.text)))));
   if (info.bells?.length || info.timetable?.length) wrap.append(scheduleCard(info));
-  if (info.holidays?.length) wrap.append(h('section.card', h('h3', 'Каникулы и выходные'),
-    h('ul.plain', info.holidays.map(x => h('li', h('b', x.title), h('span.muted', ' ' + (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' – ' + fdate(x.to) : '')))))));
+  if (info.holidays?.length) {
+    const t0 = new Date(new Date().toDateString());
+    const D = x => new Date(x + 'T00:00:00');
+    const days = n => n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'день' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'дня' : 'дней');
+    const next = info.holidays.filter(x => x.from && D(x.to || x.from) >= t0).sort((a, b) => a.from.localeCompare(b.from))[0];
+    wrap.append(h('section.card', h('h3', '🌴 Каникулы'),
+      next ? (D(next.from) <= t0 ? h('div.hol-now', '🎉 Сейчас идут: ', h('b', next.title), ', до ' + fdate(next.to))
+        : h('div.hol-now', h('b', next.title), ' через ', h('b', days(Math.round((D(next.from) - t0) / 864e5))))) : null,
+      h('div.hols', info.holidays.map(x => {
+        const past = D(x.to || x.from) < t0, cur = x === next;
+        return h('div.hol' + (past ? '.past' : '') + (cur ? '.next' : ''), h('b', x.title),
+          h('span', (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' – ' + fdate(x.to) : '')),
+          x.from && x.to ? h('span.muted.small', days(Math.round((D(x.to) - D(x.from)) / 864e5) + 1)) : null);
+      }))));
+  }
   if (info.teachers?.length) wrap.append(h('section.card', h('h3', 'Учителя'),
     h('ul.plain.teachers', info.teachers.map(t => h('li', h('div.muted.small', t.role), h('div', t.name), t.contact ? h('div.small', linkify(t.contact)) : null)))));
   if (info.links?.length) wrap.append(h('section.card', h('h3', 'Полезные ссылки'),

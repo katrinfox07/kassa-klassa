@@ -408,3 +408,11 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
   .lesson.live .pill { animation: wiggle 1.6s ease-in-out infinite; }
   .modal { animation: rise .25s cubic-bezier(.2,.8,.2,1) both; }
 }
+
+/* Каникулы */
+.hol-now { background: var(--ok-soft); color: var(--ok); border-radius: 10px; padding: 7px 10px; font-weight: 700; margin-bottom: 6px; }
+.hol-now b { font-weight: 800; }
+.hols { display: grid; gap: 4px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.hol { display: grid; gap: 1px; padding: 7px 10px; border-radius: 10px; background: var(--bg); font-size: 14px; }
+.hol.next { background: var(--ok-soft); box-shadow: inset 3px 0 0 var(--ok); }
+.hol.past { opacity: .5; }
