@@ -92,7 +92,7 @@ function collectionAdminCard(c) {
   const det = h('details.more', { open: openColl.has(c.id), ontoggle: e => e.target.open ? openColl.add(c.id) : openColl.delete(c.id) },
     h('summary', 'Таблица оплат'), collectionTable(c));
   return h('section.card.coll',
-    h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'отдельный сбор') : null), c.closed ? h('span.pill', 'завершён') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
+    h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), c.closed ? h('span.pill', 'завершён') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
     h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
     progress(c),
     h('div.row.between.small', h('span', `Сдали ${paid} из ${active.length}`,
@@ -142,7 +142,7 @@ function markPaid(c, s, def) {
 }
 
 function collectionDialog(c) {
-  const isNew = !c; c = c || { title: '', description: '', amount: '', due_date: '', pay_link: '', closed: 0, separate: 0 };
+  const isNew = !c; c = c || { title: '', description: '', amount: '', due_date: '', pay_link: '', closed: 0, separate: 1 };
   const f = {
     title: h('input', { value: c.title, required: true, maxlength: 150, placeholder: 'Например: Подарки к Новому году' }),
     amount: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: c.amount, placeholder: '0 — если сумма свободная' }),
@@ -150,7 +150,7 @@ function collectionDialog(c) {
     pay_link: h('input', { type: 'url', value: c.pay_link, placeholder: 'https://…' }),
     description: h('textarea', { placeholder: 'На что собираем, подробности' }, c.description),
     closed: h('input', { type: 'checkbox', checked: !!c.closed }),
-    separate: h('input', { type: 'checkbox', checked: !!c.separate }),
+    separate: h('select', h('option', { value: '1', selected: !!c.separate }, 'Досбор — на конкретное дело (кино, фото, подарок)'), h('option', { value: '', selected: !c.separate }, 'Взнос в кассу класса')),
   };
   const close = modal(isNew ? 'Новый сбор' : 'Изменить сбор', h('form.form', {
     onsubmit: async e => {
@@ -160,12 +160,12 @@ function collectionDialog(c) {
       catch (err) { toast(err.message, true); }
     },
   },
+    h('label.field', 'Тип сбора', f.separate),
     h('label.field', 'Название', f.title),
     h('div.two', h('label.field', 'С каждого ребёнка, ₽', f.amount), h('label.field', 'Сдать до', f.due_date)),
     h('label.field', 'Ссылка на банковский сбор', f.pay_link,
       h('span.hint', 'Создайте сбор в приложении своего банка и вставьте сюда ссылку на него. По ней родители оплатят с карты любого банка или по СБП.')),
     h('label.field', 'Описание', f.description),
-    h('label.check', f.separate, 'Отдельный сбор: деньги не идут в кассу класса (например, фото, экскурсия)'),
     !isNew ? h('label.check', f.closed, 'Сбор завершён (кнопка оплаты скроется)') : null,
     h('div.row.between',
       h('button.btn.primary', { type: 'submit' }, 'Сохранить'),
