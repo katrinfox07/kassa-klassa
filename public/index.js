@@ -91,7 +91,7 @@ load();
     h('div.step', h('div',
       h('b', 'Переведите деньги'),
       c.pay_link
-        ? [h('p.small.muted', 'Откроется страница сбора в банке. Оплатить можно с карты любого банка или по СБП.'),
+        ? [h('p.small.muted', 'Откроется страница сбора в банке.'),
            h('a.btn.primary.block', { href: c.pay_link, target: '_blank', rel: 'noopener' }, `Перейти к оплате${c.amount ? ' ' + rub(c.amount) : ''}`)]
         : h('p.small.muted', 'Ссылка на оплату пока не добавлена.'),
       S.class.payHint ? h('p.small.pre', { style: 'margin-top:8px' }, S.class.payHint) : null)),
