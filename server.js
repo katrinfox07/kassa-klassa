@@ -98,6 +98,14 @@ if (!getSettingRaw('mig_5g_fix')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_fix', '1')").run();
 }
+// 5Г: вернуть ссылку Сбера рядом с Т-Банком во «Взносе в фонд класса» (просьба казначея)
+if (!getSettingRaw('mig_5g_sber')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const k = cl && q("SELECT id, pay_link FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
+  const SBER = 'https://messenger.sbrf.ru/sl/UI7lqmKtdxFRu3R47';
+  if (k && !k.pay_link.includes(SBER)) q('UPDATE collections SET pay_link=? WHERE id=?').run([SBER, ...k.pay_link.split(/\s+/).filter(Boolean)].join('\n'), k.id);
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_sber', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
