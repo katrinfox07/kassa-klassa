@@ -9,7 +9,7 @@ self.addEventListener('fetch', e => {
   const req = e.request; const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/')) return; // данные всегда свежие
-  // Сначала сеть, при отсутствии связи — сохранённая копия
+  // Сначала сеть, при отсутствии связи – сохранённая копия
   e.respondWith(fetch(req).then(res => {
     if (res.ok && (STATIC.includes(url.pathname) || url.pathname.startsWith('/uploads/') || req.mode === 'navigate')) {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy));
@@ -18,7 +18,7 @@ self.addEventListener('fetch', e => {
   }).catch(() => caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('/offline.html') : Response.error()))));
 });
 
-// Уведомления казначею: «Иванов Петя — 5 000 ₽»
+// Уведомления казначею: «Иванов Петя – 5 000 ₽»
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch { d = { title: 'Касса класса', body: e.data ? e.data.text() : '' }; }
   const time = d.ts ? new Date(d.ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';

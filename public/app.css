@@ -442,7 +442,7 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .tbl tr.debt td:first-child { box-shadow: inset 4px 0 0 var(--orange); }
 .tbl tr.debt .pill.bad { background: var(--orange); color: #fff; }
 
-/* Закрытые сборы — бледные */
+/* Закрытые сборы – бледные */
 .coll.closed { background: color-mix(in srgb, var(--card) 60%, var(--bg)); box-shadow: none; }
 .coll.closed > *:not(.row):not(details) { opacity: .55; }
 .coll.closed .title, .coll.closed .meta { opacity: .6; }
@@ -528,7 +528,7 @@ div.field .linklike { justify-self: start; }
 .headteacher { display: block; padding: 6px 0 8px; margin: 0 0 4px; border: 0; border-radius: 0; background: none; border-bottom: 1px dashed var(--line); }
 .ht-label { font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 700; }
 .ht-name { font-size: inherit; font-weight: 700; }
-/* строки с долгом без подсветки — достаточно оранжевой плашки */
+/* строки с долгом без подсветки – достаточно оранжевой плашки */
 .tbl tr.debt td, .tbl tr.debt td:first-child, .tbl tr.debt td:last-child { background: none; box-shadow: none; border-radius: 0; font-weight: inherit; }
 .tbl tr.debt .pill.bad { background: var(--orange-soft); color: var(--orange); }
 .classlist { margin: 6px 0 0; padding-left: 28px; columns: 2 220px; column-gap: 24px; }

@@ -169,7 +169,7 @@ function scheduleCard(info) {
     while (lessons.length && !lessons[lessons.length - 1]) lessons.pop();
     const n = days.length ? lessons.length : bells.length;
     const todayOn = days.length ? isToday : now.getDay() % 6;
-    const isEmpty = i => days.length && (!lessons[i] || /^[—-]+$/.test(lessons[i]));
+    const isEmpty = i => days.length && (!lessons[i] || /^[–-]+$/.test(lessons[i]));
     const rows = [];
     for (let i = 0; i < n; i++) {
       const b = bells[i] || {}, subj = days.length ? lessons[i] : '';
@@ -250,7 +250,7 @@ function expRow(e, coll, extra) {
   return h('div.exprow',
     r.length ? h('button.expthumb', { onclick: () => r.length > 1 ? modal('Чеки: ' + e.title, h('div.stack', r.map(src => h('img.full-img', { src, alt: 'Чек' })))) : viewImage(r[0]), 'aria-label': 'Открыть чек' },
       h('img', { src: r[0], alt: 'Чек', loading: 'lazy' }), r.length > 1 ? h('span.expcount', r.length) : null)
-      : h('div.expthumb.none', { title: 'Чек не приложен' }, '—'),
+      : h('div.expthumb.none', { title: 'Чек не приложен' }, '–'),
     h('div.expmain', h('div.exptitle', e.title), h('div.expmeta', fdate(e.date) + (coll ? ' · ' + coll : '') + (e.note ? ' · ' + e.note : ''))),
     h('div.expsum', rub(e.amount)), extra || null);
 }
