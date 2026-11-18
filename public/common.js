@@ -327,7 +327,7 @@ const inDays = n => n === 0 ? 'сегодня' : n === 1 ? 'завтра' : n ==
 function bdayBanner(ev) {
   const list = upcomingBdays(ev, 3); if (!list.length) return null;
   return h('section.card.bday-banner', h('span.bb-ic', '🎂'), h('div', list.map(b => h('div',
-    h('b', inDays(b.in)), ' день рождения у ', h('b', b.teacher ? b.name : b.name), b.teacher ? h('span.muted', ' (учитель)') : null,
+    h('b', inDays(b.in)[0].toUpperCase() + inDays(b.in).slice(1)), ' день рождения: ', h('b', b.name), b.teacher ? h('span.muted', ' (учитель)') : null,
     b.age ? h('span.muted', `, исполнится ${b.age}`) : null))));
 }
 function calendarCard(st, admin) {
