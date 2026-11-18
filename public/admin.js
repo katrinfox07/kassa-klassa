@@ -243,8 +243,7 @@ VIEWS['класс'] = () => {
         const parent = h('input', { value: s.parent || '', maxlength: 200, onchange: act(() => save(s, { parent: parent.value }), 'Сохранено') });
         return h('tr', { class: s.active ? '' : 'out' }, h('td.muted.small', i + 1), h('td', full), h('td', birth), h('td', parent),
           h('td', h('div.actions',
-            h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'),
-            h('button.icon-btn', { 'aria-label': 'Удалить', onclick: () => confirmInline(() => {}, `Удалить «${s.name}» из списка?`, async () => { await api('DELETE', '/api/admin/students/' + s.id); load(); }) }, '🗑'))));
+            h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'))));
       }))))),
     h('section.card.form', h('h3', 'Добавить детей или дополнить данные'), h('p.hint', 'Вставьте список из таблицы. Если ребёнок уже есть в списке, его дата рождения и родитель просто допишутся, дубля не будет.'), ta,
       h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Сохранено') }, 'Сохранить')));
