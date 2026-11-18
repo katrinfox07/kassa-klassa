@@ -416,3 +416,16 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .hol { display: grid; gap: 1px; padding: 7px 10px; border-radius: 10px; background: var(--bg); font-size: 14px; }
 .hol.next { background: var(--ok-soft); box-shadow: inset 3px 0 0 var(--ok); }
 .hol.past { opacity: .5; }
+
+/* Расходы списком */
+.explist { display: grid; }
+.exprow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.exprow:last-child { border-bottom: 0; }
+.expthumb { position: relative; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 9px; overflow: hidden; background: var(--bg); cursor: pointer; box-shadow: var(--shadow); }
+.expthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.expthumb.none { display: grid; place-items: center; color: var(--muted); box-shadow: none; cursor: default; }
+.expcount { position: absolute; right: 2px; bottom: 2px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; border-radius: 6px; padding: 0 4px; }
+.exptitle { font-weight: 700; font-size: 14px; line-height: 1.25; }
+.expmeta { color: var(--muted); font-size: 12.5px; }
+.expsum { font-weight: 800; color: var(--coral); white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px; }
+.exprow .icon-btn { padding: 2px 6px; }

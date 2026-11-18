@@ -102,14 +102,9 @@ load();
 function expensesView() {
   if (!S.expenses.length) return h('p.empty', 'Расходов пока нет.');
   const byColl = id => S.collections.find(c => c.id === id)?.title;
-  return h('div.stack', S.expenses.map(e => h('section.card',
-    h('div.exp', h('div.grow',
-      h('div', h('b', e.title)),
-      h('div.muted.small', fdate(e.date), byColl(e.collection_id) ? ' · ' + byColl(e.collection_id) : ''),
-      e.note ? h('p.small.pre', { style: 'margin-top:6px' }, e.note) : null),
-      h('div.sum', rub(e.amount))),
-    e.receipts.length ? h('div.thumbs', e.receipts.map(src => h('button', { onclick: () => viewImage(src), 'aria-label': 'Открыть чек' }, h('img', { src, alt: 'Чек', loading: 'lazy' })))) :
-      h('div.hint', { style: 'margin-top:6px' }, 'Чек не приложен'))));
+  const total = S.expenses.reduce((a, e) => a + e.amount, 0);
+  return h('section.card', h('div.row.between', h('h3', '🧾 Расходы'), h('span.muted.small', `${S.expenses.length} шт. · ${rub(total)}`)),
+    h('div.explist', S.expenses.map(e => expRow(e, byColl(e.collection_id)))));
 }
 
 if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';

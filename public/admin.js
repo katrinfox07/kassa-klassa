@@ -202,15 +202,11 @@ function remind(c) {
 VIEWS['расходы'] = () => {
   const wrap = h('div.stack', h('div.row', h('button.btn.primary', { onclick: expenseDialog }, '+ Добавить расход с чеком')));
   if (!S.expenses.length) wrap.append(h('p.empty', 'Расходов пока нет.'));
-  S.expenses.forEach(e => wrap.append(h('section.card',
-    h('div.exp', h('div.grow', h('b', e.title), h('div.muted.small', fdate(e.date), e.collection_id ? ' · ' + cTitle(e.collection_id) : ''), e.note ? h('p.small.pre', e.note) : null),
-      h('div.sum', rub(e.amount))),
-    h('div.row.between', { style: 'margin-top:6px' },
-      e.receipts.length ? h('div.thumbs', e.receipts.map(src => h('button', { onclick: () => viewImage(src) }, h('img', { src, alt: 'Чек', loading: 'lazy' })))) : h('span.pill.warn', 'нет чека'),
-      h('button.icon-btn', { 'aria-label': 'Ещё', title: 'Ещё', onclick: () => {
-        const close = modal(e.title, h('div.form', h('p.muted', fdate(e.date) + ' · ' + rub(e.amount)),
-          h('button.linklike.danger-text', { onclick: () => confirmInline(close, `Удалить расход «${e.title}» вместе с чеками? Вернуть будет нельзя.`, async () => { await api('DELETE', '/api/admin/expenses/' + e.id); toast('Удалено'); load(); }) }, 'Удалить этот расход')));
-      } }, '⋯')))));
+  if (S.expenses.length) wrap.append(h('section.card', h('div.explist', S.expenses.map(e => expRow(e, e.collection_id ? cTitle(e.collection_id) : '',
+    h('button.icon-btn', { 'aria-label': 'Ещё', title: 'Ещё', onclick: () => {
+      const close = modal(e.title, h('div.form', h('p.muted', fdate(e.date) + ' · ' + rub(e.amount)),
+        h('button.linklike.danger-text', { onclick: () => confirmInline(close, `Удалить расход «${e.title}» вместе с чеками? Вернуть будет нельзя.`, async () => { await api('DELETE', '/api/admin/expenses/' + e.id); toast('Удалено'); load(); }) }, 'Удалить этот расход')));
+    } }, '⋯'))))));
   return wrap;
 };
 

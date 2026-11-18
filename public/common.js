@@ -225,3 +225,14 @@ function installButton() {
   };
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', start) : start();
 })();
+
+// Компактная строка расхода: миниатюра чека, название, дата, сумма
+function expRow(e, coll, extra) {
+  const r = e.receipts || [];
+  return h('div.exprow',
+    r.length ? h('button.expthumb', { onclick: () => r.length > 1 ? modal('Чеки: ' + e.title, h('div.stack', r.map(src => h('img.full-img', { src, alt: 'Чек' })))) : viewImage(r[0]), 'aria-label': 'Открыть чек' },
+      h('img', { src: r[0], alt: 'Чек', loading: 'lazy' }), r.length > 1 ? h('span.expcount', r.length) : null)
+      : h('div.expthumb.none', { title: 'Чек не приложен' }, '—'),
+    h('div.expmain', h('div.exptitle', e.title), h('div.expmeta', fdate(e.date) + (coll ? ' · ' + coll : '') + (e.note ? ' · ' + e.note : ''))),
+    h('div.expsum', rub(e.amount)), extra || null);
+}
