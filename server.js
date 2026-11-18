@@ -277,12 +277,13 @@ function rate(req, key, max, windowMs) {
 }
 
 route('GET', '/api/me', (req, res, b, p, u) => {
-  if (!u) return send(res, 200, { user: null });
+  if (!u) return send(res, 200, { user: null, signup: process.env.SIGNUP === 'open' });
   const classes = q('SELECT slug, title, paid_until, EXISTS(SELECT 1 FROM subscriptions x WHERE x.class_id=c.id) AS paid FROM classes c WHERE user_id=? ORDER BY id').all(u.id);
   send(res, 200, { user: { email: u.email, name: u.name, owner: u.is_owner }, classes, price: PRICE, trialDays: TRIAL_DAYS });
 });
 route('GET', '/api/config', (req, res) => send(res, 200, { price: PRICE, trialDays: TRIAL_DAYS }));
 route('POST', '/api/auth/register', async (req, res, b) => {
+  if (process.env.SIGNUP !== 'open') bad('Регистрация пока закрыта');
   rate(req, 'reg', 10, 3600e3);
   const email = str(b.email, 200).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) bad('Проверьте почту');
@@ -576,7 +577,8 @@ function sendManifest(res, { name, short, start, id }) {
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
   }));
 }
-const PAGES = { '/': 'landing.html', '/account': 'account.html', '/owner': 'owner.html', '/oferta': 'oferta.html', '/privacy': 'privacy.html' };
+const SIGNUP_OPEN = process.env.SIGNUP === 'open'; // пока сервис закрыт: без регистрации и рекламы на главной
+const PAGES = { '/': SIGNUP_OPEN ? 'landing.html' : 'soon.html', '/account': 'account.html', '/owner': 'owner.html', '/oferta': 'oferta.html', '/privacy': 'privacy.html' };
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');

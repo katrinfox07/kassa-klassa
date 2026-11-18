@@ -6,7 +6,7 @@ const safeNext = next && /^\/c\/[a-z0-9-]+(\/admin)?$/.test(next) ? next : null;
 
 async function start() {
   ME = await api('GET', '/api/me').catch(() => ({ user: null }));
-  if (!ME.user) return authView(location.hash === '#register' ? 'up' : 'in');
+  if (!ME.user) return authView(location.hash === '#register' && ME.signup ? 'up' : 'in');
   if (safeNext) { location.href = safeNext; return; }
   $('#sub').textContent = ME.user.email;
   $('#head-actions').replaceChildren(...[
@@ -39,7 +39,7 @@ function authView(mode) {
     h('label.field', 'Пароль' + (mode === 'up' ? ' (не короче 8 символов)' : ''), pass),
     mode === 'up' ? h('label.check.small', consent, h('span', 'Согласна(ен) на ', h('a', { href: '/privacy', target: '_blank' }, 'обработку персональных данных'), ' и принимаю ', h('a', { href: '/oferta', target: '_blank' }, 'условия сервиса'))) : null,
     btn,
-    h('button.btn.small', { type: 'button', onclick: () => { history.replaceState(null, '', location.pathname + location.search + (mode === 'up' ? '' : '#register')); authView(mode === 'up' ? 'in' : 'up'); } },
+    !ME.signup ? null : h('button.btn.small', { type: 'button', onclick: () => { history.replaceState(null, '', location.pathname + location.search + (mode === 'up' ? '' : '#register')); authView(mode === 'up' ? 'in' : 'up'); } },
       mode === 'up' ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Регистрация'));
   $('#main').replaceChildren(form);
 }
