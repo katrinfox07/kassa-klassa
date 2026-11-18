@@ -243,16 +243,19 @@ function expenseDialog() {
 // ---------- Список класса ----------
 VIEWS['класс'] = () => {
   const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя — по одному на строку (можно вставить из таблицы)' });
-  const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, active: s.active, ...patch });
+  const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
   return h('div.stack',
     h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Выбывших лучше отмечать, а не удалять: так сохранится история оплат.'),
       h('div.tbl-scroll', h('table.tbl',
-        h('thead', h('tr', h('th', '№'), h('th', 'ФИО ребёнка'), h('th', 'Дата рождения'), h('th', 'Родитель'), h('th', ''))),
+        h('thead', h('tr', h('th', '№'), h('th', 'ФИО ребёнка'), h('th', 'Дата рождения'), h('th', 'Родитель'), h('th', 'Телефон'), h('th', ''))),
         h('tbody', S.students.map((s, i) => {
         const full = h('input', { value: s.full_name || s.name, maxlength: 160, onchange: act(() => save(s, { full_name: full.value }), 'Сохранено') });
         const birth = h('input', { value: s.birth || '', maxlength: 20, placeholder: 'дд.мм.гггг', style: 'width:8.5em', onchange: act(() => save(s, { birth: birth.value }), 'Сохранено') });
         const parent = h('input', { value: s.parent || '', maxlength: 200, onchange: act(() => save(s, { parent: parent.value }), 'Сохранено') });
+        const phone = h('input', { value: s.phone || '', maxlength: 200, type: 'tel', placeholder: '8-900-000-00-00', onchange: act(() => save(s, { phone: phone.value }), 'Сохранено') });
+        const calls = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean).map(x => h('a.small', { href: 'tel:' + x.replace(/[^\d+]/g, '') }, '📞 ' + x));
         return h('tr', { class: s.active ? '' : 'out' }, h('td.muted.small', i + 1), h('td', full), h('td', birth), h('td', parent),
+          h('td.phones', phone, calls.length ? h('div.calls', calls) : null),
           h('td', h('div.actions',
             h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'))));
       }))))),

@@ -256,3 +256,7 @@ header.top.hero a { color: #fff; }
 
 .linklike { border: 0; background: none; padding: 6px 0; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; color: var(--muted); }
 .linklike.danger-text { color: var(--bad); opacity: .8; }
+
+.tbl td.phones { min-width: 190px; }
+.tbl td .calls { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.tbl td .calls a { text-decoration: none; white-space: nowrap; }

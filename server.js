@@ -68,8 +68,15 @@ CREATE INDEX IF NOT EXISTS i_exp ON expenses(class_id);
 `);
 const q = (sql) => db.prepare(sql);
 // миграция: полные данные ученика (видны только казначею)
-for (const col of ['full_name', 'birth', 'parent']) {
+for (const col of ['full_name', 'birth', 'parent', 'phone']) {
   try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
+}
+// телефоны отдельно от ФИО родителя
+const PHONE_RE = /(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}/g;
+const splitPhones = t => { const phones = String(t || '').match(PHONE_RE) || [];
+  return { parent: String(t || '').replace(PHONE_RE, '').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').replace(/[\s,]+$/, '').replace(/\s{2,}/g, ' ').trim(), phone: phones.map(x => x.trim()).join(', ') }; };
+for (const r of q("SELECT id, parent FROM students WHERE phone='' AND parent<>''").all()) {
+  const x = splitPhones(r.parent); if (x.phone) q('UPDATE students SET parent=?, phone=? WHERE id=?').run(x.parent, x.phone, r.id);
 }
 // убрать служебную пометку после переноса из таблицы
 db.exec(`UPDATE collections SET description = trim(replace(replace(description, ' Перенесено из таблицы.', ''), 'Перенесено из таблицы.', '')) WHERE description LIKE '%Перенесено из таблицы.%'`);
@@ -93,12 +100,13 @@ function parseStudent(line) {
     const w = full.split(' ');
     if (w.length >= 5) { full = w.slice(0, 3).join(' '); parent = w.slice(3).join(' '); }
   }
-  full = full.slice(0, 160); parent = parent.slice(0, 200);
+  const sp = splitPhones(parent); parent = sp.parent.slice(0, 200); const phone = sp.phone.slice(0, 200);
+  full = full.slice(0, 160);
   const name = full.split(' ').slice(0, 2).join(' ').slice(0, 120);
-  return name ? { name, full, birth, parent } : null;
+  return name ? { name, full, birth, parent, phone } : null;
 }
-const insStudent = (cid, st, sort) => q('INSERT INTO students(class_id, name, full_name, birth, parent, sort) VALUES(?,?,?,?,?,?)')
-  .run(cid, st.name, st.full, st.birth, st.parent, sort);
+const insStudent = (cid, st, sort) => q('INSERT INTO students(class_id, name, full_name, birth, parent, phone, sort) VALUES(?,?,?,?,?,?,?)')
+  .run(cid, st.name, st.full, st.birth, st.parent, st.phone, sort);
 
 const DEFAULT_INFO = {
   announcements: [],
@@ -181,7 +189,7 @@ function freeSlug(base) {
 // ---------- Данные класса ----------
 function classState(c, admin) {
   const cid = c.id;
-  const students = q('SELECT id, name, full_name, birth, parent, active FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
+  const students = q('SELECT id, name, full_name, birth, parent, phone, active FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
   const collections = q('SELECT * FROM collections WHERE class_id=? ORDER BY closed, COALESCE(due_date, created_at) DESC, id DESC').all(cid);
   const payments = q(`SELECT id, collection_id, student_id, amount, status, payer, note, source, created_at, decided_at,
     screenshot IS NOT NULL AS has_shot FROM payments WHERE class_id=? AND (status != 'rejected' OR ?) ORDER BY created_at DESC`).all(cid, admin ? 1 : 0);
@@ -315,7 +323,7 @@ route('POST', '/admin/students', (req, res, b, p, u, c) => {
   names.forEach(st => {
     const ex = q('SELECT id FROM students WHERE class_id=? AND lower(name)=lower(?)').get(c.id, st.name);
     if (ex) q(`UPDATE students SET full_name=?, birth=CASE WHEN ?<>'' THEN ? ELSE birth END,
-      parent=CASE WHEN ?<>'' THEN ? ELSE parent END WHERE id=?`).run(st.full, st.birth, st.birth, st.parent, st.parent, ex.id);
+      parent=CASE WHEN ?<>'' THEN ? ELSE parent END, phone=CASE WHEN ?<>'' THEN ? ELSE phone END WHERE id=?`).run(st.full, st.birth, st.birth, st.parent, st.parent, st.phone, st.phone, ex.id);
     else insStudent(c.id, st, max + ++n);
   });
   send(res, 200, { ok: true });
@@ -323,8 +331,8 @@ route('POST', '/admin/students', (req, res, b, p, u, c) => {
 route('PUT', '/admin/students/:id', (req, res, b, p, u, c) => {
   const full = str(b.full_name || b.name, 160).replace(/\s+/g, ' ');
   const name = full.split(' ').slice(0, 2).join(' '); if (!name) bad('Введите имя');
-  q('UPDATE students SET name=?, full_name=?, birth=?, parent=?, active=? WHERE id=? AND class_id=?')
-    .run(name, full, str(b.birth, 20), str(b.parent, 200), b.active ? 1 : 0, int(p.id), c.id);
+  q('UPDATE students SET name=?, full_name=?, birth=?, parent=?, phone=?, active=? WHERE id=? AND class_id=?')
+    .run(name, full, str(b.birth, 20), str(b.parent, 200), str(b.phone, 200), b.active ? 1 : 0, int(p.id), c.id);
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/students/:id', (req, res, b, p, u, c) => {
