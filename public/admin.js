@@ -275,7 +275,7 @@ VIEWS['класс'] = () => {
   const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя — по одному на строку (можно вставить из таблицы)' });
   const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
   return h('div.stack',
-    h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Чтобы поправить данные, нажмите на ребёнка.'),
+    h('section.card', h('p.hint', 'Родители видят этот список во вкладке «Список класса» после ввода кода класса: ', h('b', S.class.listCode || '—'), '. Код можно поменять в «Настройках». Чтобы поправить данные, нажмите на ребёнка.'),
       h('div.kidlist', S.students.map((s, i) => {
         return h('div.kid' + (s.active ? '' : '.out'), { onclick: () => editKid(s, save), role: 'button', tabindex: 0 },
           h('div.kid-n', i + 1),
@@ -288,18 +288,6 @@ VIEWS['класс'] = () => {
       h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Сохранено') }, 'Сохранить')));
 };
 
-// родитель и его телефон рядом; если телефонов меньше, чем родителей, они относятся к последним в списке
-function parentRows(s) {
-  const names = (s.parent || '').split(',').map(x => x.trim()).filter(Boolean);
-  const phones = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean);
-  const call = x => h('a.call', { href: 'tel:' + x.replace(/[^\d+]/g, ''), onclick: e => e.stopPropagation() }, '📞 ' + x);
-  if (!names.length && !phones.length) return h('div.muted', 'родитель не указан');
-  const n = Math.max(names.length, phones.length), off = names.length - phones.length;
-  return h('div.parents', Array.from({ length: n }, (_, i) => {
-    const ph = off >= 0 ? phones[i - off] : phones[i];
-    return h('div.prow', h('span', names[i] || ''), ph ? call(ph) : null);
-  }));
-}
 function editKid(s, save) {
   const f = {
     full: h('input', { value: s.full_name || s.name, maxlength: 160 }),
@@ -380,6 +368,7 @@ VIEWS['настройки'] = () => {
   const f = {
     title: h('input', { value: S.class.title, maxlength: 100, placeholder: 'Например: 5 «Б» класс' }),
     treasurer: h('input', { value: S.class.treasurer, maxlength: 100, placeholder: 'Как к вам обращаться' }),
+    listCode: h('input', { value: S.class.listCode || '', maxlength: 20, placeholder: 'Например: 5g2026' }),
     payHint: h('textarea', { placeholder: 'Например: если не получается по ссылке — напишите мне в чат' }, S.class.payHint),
     opening: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: S.opening?.amount || 0 }),
     openingNote: h('input', { value: S.opening?.note || '', maxlength: 200, placeholder: 'Например: остаток прошлых сборов' }),
@@ -388,6 +377,7 @@ VIEWS['настройки'] = () => {
     h('section.card.form', h('h3', 'Класс'),
       h('label.field', 'Название (заголовок страницы)', f.title),
       h('label.field', 'Казначей', f.treasurer),
+      h('label.field', 'Код для списка класса (родители вводят его, чтобы увидеть ФИО, даты рождения и телефоны)', f.listCode),
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
       h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]))), 'Сохранено') }, 'Сохранить')),

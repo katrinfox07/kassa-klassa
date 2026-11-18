@@ -143,6 +143,14 @@ if (!getSettingRaw('mig_5g_klbday')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_klbday', '1')").run();
 }
+// код для списка класса: каждому классу случайный, казначей видит и меняет его в «Настройках»
+if (!getSettingRaw('mig_list_code')) {
+  for (const r of q("SELECT class_id, value FROM class_settings WHERE key='class'").all()) {
+    const v = JSON.parse(r.value || '{}');
+    if (!v.listCode) { v.listCode = String(crypto.randomInt(1000, 10000)); q("UPDATE class_settings SET value=? WHERE class_id=? AND key='class'").run(JSON.stringify(v), r.class_id); }
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_list_code', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -292,7 +300,7 @@ function classState(c, admin) {
     k.spent = expenses.filter(e => e.collection_id === k.id).reduce((s, e) => s + e.amount, 0);
   }
   return {
-    class: { ...getSetting(cid, 'class', {}), title: c.title, slug: c.slug },
+    class: (({ listCode, ...rest }) => ({ ...rest, ...(admin ? { listCode } : { hasList: !!listCode }), title: c.title, slug: c.slug }))(getSetting(cid, 'class', {})),
     subscription: admin ? { paid_until: c.paid_until, active: c.paid_until >= today(), price: PRICE } : undefined,
     info: getSetting(cid, 'info', DEFAULT_INFO),
     students: students.filter(s => s.active || admin).map(s => admin ? s : { id: s.id, name: s.name }),
@@ -366,7 +374,7 @@ route('POST', '/api/classes', (req, res, b, p, u) => {
   const slug = freeSlug(b.slug || title);
   const r = q('INSERT INTO classes(slug, title, user_id, paid_until) VALUES(?,?,?,?)').run(slug, title, u.id, addDays(today(), TRIAL_DAYS));
   const cid = r.lastInsertRowid;
-  setSetting(cid, 'class', { treasurer: u.name || '', payHint: '' });
+  setSetting(cid, 'class', { treasurer: u.name || '', payHint: '', listCode: String(crypto.randomInt(1000, 10000)) });
   setSetting(cid, 'info', DEFAULT_INFO);
   String(b.students || '').split('\n').map(parseStudent).filter(Boolean).slice(0, 60).forEach((st, i) => insStudent(cid, st, i));
   send(res, 200, { ok: true, slug });
@@ -374,6 +382,13 @@ route('POST', '/api/classes', (req, res, b, p, u) => {
 
 // --- Публичная страница класса ---
 route('GET', '/public', (req, res, b, p, u, c) => send(res, 200, classState(c, false)), { cls: true });
+// Полный список класса для родителей — только по коду класса
+route('POST', '/roster', (req, res, b, p, u, c) => {
+  rate(req, 'roster', 20, 600e3);
+  const code = getSetting(c.id, 'class', {}).listCode || '';
+  if (!code || str(b.code, 40).toLowerCase() !== code.toLowerCase()) bad('Неверный код. Спросите его у казначея в чате класса.');
+  send(res, 200, { students: q('SELECT name, full_name, birth, parent, phone FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id) });
+}, { cls: true });
 route('POST', '/report-payment', async (req, res, b, p, u, c) => {
   rate(req, 'report', 20, 3600e3);
   const k = q('SELECT * FROM collections WHERE id=? AND class_id=?').get(int(b.collection_id), c.id);
@@ -576,7 +591,9 @@ route('PUT', '/admin/info', (req, res, b, p, u, c) => {
 route('PUT', '/admin/class', (req, res, b, p, u, c) => {
   const title = str(b.title, 100) || c.title;
   q('UPDATE classes SET title=? WHERE id=?').run(title, c.id);
-  setSetting(c.id, 'class', { treasurer: str(b.treasurer, 100), payHint: str(b.payHint, 1000), showBirthdays: !!b.showBirthdays });
+  const prevCls = getSetting(c.id, 'class', {});
+  setSetting(c.id, 'class', { treasurer: str(b.treasurer, 100), payHint: str(b.payHint, 1000), showBirthdays: !!b.showBirthdays,
+    listCode: b.listCode !== undefined ? str(b.listCode, 20) : prevCls.listCode || '' });
   if (b.opening !== undefined) setSetting(c.id, 'opening', { amount: Math.max(0, int(b.opening) || 0), note: str(b.openingNote, 200) });
   send(res, 200, { ok: true });
 }, W);

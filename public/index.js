@@ -25,8 +25,7 @@ function show(id) {
   const m = $('#main');
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
-  if (id === 'класс') m.replaceChildren(h('section.card', h('div.row.between', h('h3', 'Список класса'), h('span.muted.small', S.students.length + ' детей')),
-    h('ol.classlist', S.students.map(s => h('li', s.name)))));
+  if (id === 'класс') m.replaceChildren(rosterView());
   if (id === 'инфо') m.replaceChildren(renderInfo(S.info));
 }
 
@@ -116,3 +115,29 @@ function expensesView() {
 
 if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';
 load();
+
+let ROSTER = null;
+function rosterView() {
+  const box = h('section.card');
+  const draw = () => {
+    if (ROSTER) {
+      box.replaceChildren(h('div.row.between', h('h3', 'Список класса'), h('span.muted.small', ROSTER.length + ' детей')),
+        h('div.kidlist', ROSTER.map((s, i) => h('div.kid', h('div.kid-n', i + 1),
+          h('div.kid-main', h('div.kid-name', s.full_name || s.name), s.birth ? h('div.kid-meta', '🎂 ' + s.birth) : null),
+          h('div.kid-parent', parentRows(s))))));
+      return;
+    }
+    if (!S.class.hasList) { box.replaceChildren(h('h3', 'Список класса'), h('ol.classlist', S.students.map(s => h('li', s.name)))); return; }
+    const inp = h('input', { inputmode: 'numeric', placeholder: 'Код класса', autocomplete: 'off', style: 'max-width:180px' });
+    const go = async code => {
+      try { ROSTER = (await api('POST', '/api/roster', { code })).students; try { localStorage.setItem('roster-' + SLUG, code); } catch { } draw(); }
+      catch (e) { if (inp.isConnected) toast(e.message, true); try { localStorage.removeItem('roster-' + SLUG); } catch { } }
+    };
+    box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Здесь ФИО детей, даты рождения и телефоны родителей. Введите код класса — его знает казначей и присылает в чат класса.'),
+      h('form.row', { onsubmit: e => { e.preventDefault(); go(inp.value.trim()); } }, inp, h('button.btn.primary', { type: 'submit' }, 'Открыть')));
+    let saved = null; try { saved = localStorage.getItem('roster-' + SLUG); } catch { }
+    if (saved) go(saved);
+  };
+  draw();
+  return box;
+}

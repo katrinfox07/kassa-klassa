@@ -363,3 +363,16 @@ function calendarCard(st, admin) {
   return box;
 }
 const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+// родитель и его телефон рядом; если телефонов меньше, чем родителей, они относятся к последним в списке
+function parentRows(s) {
+  const names = (s.parent || '').split(',').map(x => x.trim()).filter(Boolean);
+  const phones = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean);
+  const call = x => h('a.call', { href: 'tel:' + x.replace(/[^\d+]/g, ''), onclick: e => e.stopPropagation() }, '📞 ' + x);
+  if (!names.length && !phones.length) return h('div.muted', 'родитель не указан');
+  const n = Math.max(names.length, phones.length), off = names.length - phones.length;
+  return h('div.parents', Array.from({ length: n }, (_, i) => {
+    const ph = off >= 0 ? phones[i - off] : phones[i];
+    return h('div.prow', h('span', names[i] || ''), ph ? call(ph) : null);
+  }));
+}
