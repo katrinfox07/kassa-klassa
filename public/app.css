@@ -528,3 +528,5 @@ div.field .linklike { justify-self: start; }
 .headteacher { display: block; padding: 6px 0 8px; margin: 0 0 4px; border: 0; border-radius: 0; background: none; border-bottom: 1px dashed var(--line); }
 .ht-label { font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 700; }
 .ht-name { font-size: inherit; font-weight: 700; }
+/* строки с долгом без подсветки — достаточно оранжевой плашки */
+.tbl tr.debt td, .tbl tr.debt td:first-child, .tbl tr.debt td:last-child { background: none; box-shadow: none; border-radius: 0; font-weight: inherit; }
