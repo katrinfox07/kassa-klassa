@@ -178,7 +178,7 @@ function scheduleCard(info) {
     }));
   };
   draw();
-  return h('section.card', h('h3', '📅 Расписание'), days.length ? chips : null, list);
+  return h('section.card', h('h3', '📅 Расписание из электронного журнала'), days.length ? chips : null, list);
 }
 function linkify(s) {
   if (/^\+?[\d\s()-]{7,}$/.test(s)) return h('a', { href: 'tel:' + s.replace(/[^\d+]/g, '') }, s);
