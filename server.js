@@ -67,6 +67,8 @@ CREATE INDEX IF NOT EXISTS i_pay ON payments(class_id);
 CREATE INDEX IF NOT EXISTS i_exp ON expenses(class_id);
 `);
 const q = (sql) => db.prepare(sql);
+db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
+const getSettingRaw = k => q('SELECT value FROM meta WHERE key=?').get(k)?.value;
 // миграция: полные данные ученика (видны только казначею)
 for (const col of ['full_name', 'birth', 'parent', 'phone']) {
   try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
@@ -77,6 +79,12 @@ const splitPhones = t => { const phones = String(t || '').match(PHONE_RE) || [];
   return { parent: String(t || '').replace(PHONE_RE, '').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').replace(/[\s,]+$/, '').replace(/\s{2,}/g, ' ').trim(), phone: phones.map(x => x.trim()).join(', ') }; };
 for (const r of q("SELECT id, parent FROM students WHERE phone='' AND parent<>''").all()) {
   const x = splitPhones(r.parent); if (x.phone) q('UPDATE students SET parent=?, phone=? WHERE id=?').run(x.parent, x.phone, r.id);
+}
+// отдельные сборы (досбор на конкретное дело) не входят в кассу класса
+try { db.exec('ALTER TABLE collections ADD COLUMN separate INTEGER NOT NULL DEFAULT 0'); } catch {}
+if (!getSettingRaw('mig_photo_separate')) {
+  db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото — 450%'");
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_separate', '1')").run();
 }
 // убрать служебную пометку после переноса из таблицы
 db.exec(`UPDATE collections SET description = trim(replace(replace(description, ' Перенесено из таблицы.', ''), 'Перенесено из таблицы.', '')) WHERE description LIKE '%Перенесено из таблицы.%'`);
@@ -196,8 +204,9 @@ function classState(c, admin) {
   const expenses = q('SELECT * FROM expenses WHERE class_id=? ORDER BY date DESC, id DESC').all(cid);
   const receipts = q('SELECT r.expense_id, r.file FROM receipts r JOIN expenses e ON e.id=r.expense_id WHERE e.class_id=? ORDER BY r.id').all(cid);
   for (const e of expenses) e.receipts = receipts.filter(r => r.expense_id === e.id).map(r => '/uploads/' + r.file);
-  const collected = payments.filter(p => p.status === 'confirmed').reduce((s, p) => s + p.amount, 0);
-  const spent = expenses.reduce((s, e) => s + e.amount, 0);
+  const sep = new Set(collections.filter(k => k.separate).map(k => k.id));
+  const collected = payments.filter(p => p.status === 'confirmed' && !sep.has(p.collection_id)).reduce((s, p) => s + p.amount, 0);
+  const spent = expenses.filter(e => !sep.has(e.collection_id)).reduce((s, e) => s + e.amount, 0);
   const activeCount = students.filter(s => s.active).length;
   for (const k of collections) {
     const ps = payments.filter(p => p.collection_id === k.id);
@@ -348,12 +357,12 @@ const collectionFields = b => {
   return [title, str(b.description, 2000), amount, isDate(b.due_date) ? b.due_date : null, okLink(b.pay_link)];
 };
 route('POST', '/admin/collections', (req, res, b, p, u, c) => {
-  q('INSERT INTO collections(title, description, amount, due_date, pay_link, class_id) VALUES(?,?,?,?,?,?)').run(...collectionFields(b), c.id);
+  q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, class_id) VALUES(?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, c.id);
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/collections/:id', (req, res, b, p, u, c) => {
-  q('UPDATE collections SET title=?, description=?, amount=?, due_date=?, pay_link=?, closed=? WHERE id=? AND class_id=?')
-    .run(...collectionFields(b), b.closed ? 1 : 0, int(p.id), c.id);
+  q('UPDATE collections SET title=?, description=?, amount=?, due_date=?, pay_link=?, closed=?, separate=? WHERE id=? AND class_id=?')
+    .run(...collectionFields(b), b.closed ? 1 : 0, b.separate ? 1 : 0, int(p.id), c.id);
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/collections/:id', (req, res, b, p, u, c) => {
