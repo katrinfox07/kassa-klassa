@@ -122,18 +122,7 @@ function renderInfo(info) {
   const wrap = h('div.stack');
   if (info.announcements?.length) wrap.append(h('section.card', h('h3', 'Объявления'),
     info.announcements.map(a => h('div.announce', a.date ? h('div.muted.small', fdate(a.date)) : null, h('p.pre', a.text)))));
-  if (info.bells?.length) {
-    const now = new Date(); const mins = now.getHours() * 60 + now.getMinutes();
-    const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
-    wrap.append(h('section.card', h('h3', 'Расписание звонков'),
-      h('table.bells', h('tbody', info.bells.map(b => h('tr', { class: mins >= toM(b.from) && mins < toM(b.to) && now.getDay() % 6 ? 'now' : '' },
-        h('td.muted', b.n + ' урок'), h('td', `${b.from} – ${b.to}`)))))));
-  }
-  if (info.timetable?.length) {
-    const wd = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][new Date().getDay()];
-    wrap.append(h('section.card', h('h3', 'Расписание уроков'), h('div.timetable', info.timetable.map(d =>
-      h('div.tt-day', { class: d.day.trim().toLowerCase() === wd ? 'today' : '' }, h('b', d.day), h('ol', d.lessons.split('\n').map(x => x.trim()).filter(Boolean).map(x => h('li', x))))))));
-  }
+  if (info.bells?.length || info.timetable?.length) wrap.append(scheduleCard(info));
   if (info.holidays?.length) wrap.append(h('section.card', h('h3', 'Каникулы и выходные'),
     h('ul.plain', info.holidays.map(x => h('li', h('b', x.title), h('span.muted', ' ' + (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' – ' + fdate(x.to) : '')))))));
   if (info.teachers?.length) wrap.append(h('section.card', h('h3', 'Учителя'),
@@ -142,6 +131,34 @@ function renderInfo(info) {
     h('ul.plain', info.links.map(l => h('li', h('a', { href: l.url, target: '_blank', rel: 'noopener' }, l.title))))));
   if (!wrap.children.length) wrap.append(h('p.empty', 'Информация пока не добавлена.'));
   return wrap;
+}
+function scheduleCard(info) {
+  const bells = info.bells || [], days = (info.timetable || []).filter(d => d.day);
+  const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
+  const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
+  const todayName = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][now.getDay()];
+  const isDay = (d, n) => d.day.trim().toLowerCase() === n;
+  let cur = Math.max(0, days.findIndex(d => isDay(d, todayName)));
+  const short = d => ({ 'понедельник': 'Пн', 'вторник': 'Вт', 'среда': 'Ср', 'четверг': 'Чт', 'пятница': 'Пт', 'суббота': 'Сб', 'воскресенье': 'Вс' })[d.trim().toLowerCase()] || d.slice(0, 2);
+  const chips = h('div.daychips'), list = h('div.lessons');
+  const draw = () => {
+    chips.replaceChildren(...days.map((d, i) => h('button.daychip' + (i === cur ? '.on' : '') + (isDay(d, todayName) ? '.today' : ''),
+      { type: 'button', onclick: () => { cur = i; draw(); } }, short(d.day))));
+    const isToday = days[cur] && isDay(days[cur], todayName);
+    const lessons = days.length ? days[cur].lessons.split('\n').map(x => x.trim()) : [];
+    while (lessons.length && !lessons[lessons.length - 1]) lessons.pop();
+    const n = days.length ? lessons.length : bells.length;
+    list.replaceChildren(...Array.from({ length: n }, (_, i) => {
+      const b = bells[i] || {}, subj = days.length ? lessons[i] : '';
+      const empty = days.length && (!subj || /^[—-]+$/.test(subj));
+      const live = (days.length ? isToday : now.getDay() % 6) && b.from && mins >= toM(b.from) && mins < toM(b.to);
+      return h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : ''),
+        h('span.ln', i + 1), h('span.lt', b.from ? `${b.from}–${b.to}` : ''),
+        h('span.ls', days.length ? (empty ? 'нет урока' : subj) : ''), live ? h('span.pill.blue', 'идёт') : h('span'));
+    }));
+  };
+  draw();
+  return h('section.card', h('h3', '📅 Расписание'), days.length ? chips : null, list);
 }
 function linkify(s) {
   if (/^\+?[\d\s()-]{7,}$/.test(s)) return h('a', { href: 'tel:' + s.replace(/[^\d+]/g, '') }, s);

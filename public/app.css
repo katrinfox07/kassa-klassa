@@ -307,3 +307,55 @@ textarea { min-height: 64px; }
 .thumbs img, .thumbs button { width: 60px; height: 60px; }
 details.more > summary { margin-top: 6px; }
 @media (max-width: 480px) { .totals { margin: -32px 2px 12px; gap: 5px; } .total .value { font-size: 15px; } }
+
+/* Расписание */
+.daychips { display: flex; gap: 6px; margin: 2px 0 10px; flex-wrap: wrap; }
+.daychip { border: 0; background: var(--bg); color: var(--text); font: inherit; font-weight: 800; font-size: 14px; width: 44px; height: 36px; border-radius: 12px; cursor: pointer; position: relative; }
+.daychip.today::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--accent); }
+.daychip.on { background: var(--grad); color: #fff; }
+.daychip.on.today::after { background: #fff; }
+.lessons { display: grid; gap: 4px; }
+.lesson { display: grid; grid-template-columns: 26px 92px 1fr auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 11px; background: var(--bg); }
+.lesson .ln { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 800; background: var(--accent-soft); color: var(--accent); }
+.lesson .lt { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lesson .ls { font-weight: 700; }
+.lesson.empty .ls { font-weight: 400; color: var(--muted); font-style: italic; }
+.lesson.empty .ln { background: var(--line); color: var(--muted); }
+.lesson.live { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+@media (max-width: 420px) { .lesson { grid-template-columns: 24px 78px 1fr auto; gap: 8px; } .lesson .lt { font-size: 12px; } .daychip { width: 40px; } }
+
+/* ===== Ещё компактнее ===== */
+body { font-size: 14.5px; }
+header.top.hero { padding: 12px 14px 42px; border-radius: 18px; margin-top: 8px; }
+header.top.hero h1 { font-size: 20px; }
+header.top.hero .btn { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+.totals { margin: -30px 8px 10px; gap: 6px; }
+.total { padding: 7px 10px; border-radius: 12px; }
+.total .label { font-size: 11.5px; gap: 5px; }
+.total .label::before { width: 20px; height: 20px; font-size: 11px; border-radius: 6px; }
+.total .value { font-size: 16px; margin-top: 1px; }
+.tab { padding: 5px 11px; font-size: 13.5px; }
+.card { padding: 10px 12px; border-radius: 14px; }
+.card h3 { font-size: 15px; margin-bottom: 6px; }
+.stack { gap: 6px; }
+.btn { min-height: 34px; padding: 5px 12px; font-size: 14px; }
+input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
+.daychips { gap: 4px; margin-bottom: 6px; }
+.daychip { width: 38px; height: 30px; font-size: 13px; border-radius: 9px; }
+.lessons { gap: 2px; }
+.lesson { padding: 4px 8px; border-radius: 8px; gap: 8px; grid-template-columns: 22px 84px 1fr auto; }
+.lesson .ln { width: 20px; height: 20px; font-size: 12px; border-radius: 6px; }
+.lesson .lt { font-size: 12.5px; }
+.lesson .ls { font-size: 14px; }
+.teachers { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 12px; }
+.teachers li { background: none; border-radius: 0; padding: 4px 0; border-bottom: 1px dashed var(--line); display: grid; gap: 0; }
+.teachers li .muted.small { font-size: 12px; }
+.announce { padding: 8px 10px; }
+.kids li { padding: 4px 8px; font-size: 13.5px; }
+.kids li .ic { width: 18px; height: 18px; font-size: 11px; }
+.kid { padding: 6px 9px; }
+.kid-name { font-size: 14px; } .kid-parent, .kid .call { font-size: 13px; }
+.coll .meta { font-size: 13px; }
+.exp .sum { font-size: 14px; }
+.thumbs img, .thumbs button { width: 52px; height: 52px; border-radius: 9px; }
+.tbl td, .tbl th { padding: 4px 5px; font-size: 14px; }
