@@ -359,3 +359,7 @@ input, select, textarea { min-height: 34px; padding: 6px 9px; font-size: 14px; }
 .exp .sum { font-size: 14px; }
 .thumbs img, .thumbs button { width: 52px; height: 52px; border-radius: 9px; }
 .tbl td, .tbl th { padding: 4px 5px; font-size: 14px; }
+
+.parents { display: grid; gap: 3px; }
+.prow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.prow .call { font-size: 13px; }

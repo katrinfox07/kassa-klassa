@@ -249,18 +249,29 @@ VIEWS['класс'] = () => {
   return h('div.stack',
     h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Чтобы поправить данные, нажмите на ребёнка.'),
       h('div.kidlist', S.students.map((s, i) => {
-        const calls = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean).map(x => h('a.call', { href: 'tel:' + x.replace(/[^\d+]/g, ''), onclick: e => e.stopPropagation() }, '📞 ' + x));
         return h('div.kid' + (s.active ? '' : '.out'), { onclick: () => editKid(s, save), role: 'button', tabindex: 0 },
           h('div.kid-n', i + 1),
           h('div.kid-main', h('div.kid-name', s.full_name || s.name, s.active ? null : h('span.pill', { style: 'margin-left:6px' }, 'выбыл')),
             h('div.kid-meta', s.birth ? '🎂 ' + s.birth : 'дата рождения не указана')),
-          h('div.kid-parent', s.parent ? h('div', s.parent) : h('div.muted', 'родитель не указан'), calls.length ? h('div.calls', calls) : null),
+          h('div.kid-parent', parentRows(s)),
           h('div.kid-edit', '✎'));
       }))),
     h('section.card.form', h('h3', 'Добавить детей или дополнить данные'), h('p.hint', 'Вставьте список из таблицы. Если ребёнок уже есть в списке, его дата рождения и родитель просто допишутся, дубля не будет.'), ta,
       h('button.btn', { onclick: act(async () => { await api('POST', '/api/admin/students', { names: ta.value }); }, 'Сохранено') }, 'Сохранить')));
 };
 
+// родитель и его телефон рядом; если телефонов меньше, чем родителей, они относятся к последним в списке
+function parentRows(s) {
+  const names = (s.parent || '').split(',').map(x => x.trim()).filter(Boolean);
+  const phones = (s.phone || '').split(',').map(x => x.trim()).filter(Boolean);
+  const call = x => h('a.call', { href: 'tel:' + x.replace(/[^\d+]/g, ''), onclick: e => e.stopPropagation() }, '📞 ' + x);
+  if (!names.length && !phones.length) return h('div.muted', 'родитель не указан');
+  const n = Math.max(names.length, phones.length), off = names.length - phones.length;
+  return h('div.parents', Array.from({ length: n }, (_, i) => {
+    const ph = off >= 0 ? phones[i - off] : phones[i];
+    return h('div.prow', h('span', names[i] || ''), ph ? call(ph) : null);
+  }));
+}
 function editKid(s, save) {
   const f = {
     full: h('input', { value: s.full_name || s.name, maxlength: 160 }),
