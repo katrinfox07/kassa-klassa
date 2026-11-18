@@ -114,6 +114,13 @@ if (!getSettingRaw('mig_5g_ozon')) {
   if (k && !k.pay_link.includes(OZON)) q('UPDATE collections SET pay_link=? WHERE id=?').run([...k.pay_link.split(/\s+/).filter(Boolean), OZON].join('\n'), k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon', '1')").run();
 }
+// 5Г: оставить только ссылку Озон Банка (перевод по СБП из любого банка) — просьба казначея
+if (!getSettingRaw('mig_5g_ozon_only')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const k = cl && q("SELECT id FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
+  if (k) q('UPDATE collections SET pay_link=? WHERE id=?').run('https://finance.ozon.ru/apps/sbp/ozonbankpay/7ddcbd0b-e5b6-4953-a318-7070a275bace', k.id);
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon_only', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();

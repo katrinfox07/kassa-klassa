@@ -272,7 +272,7 @@ const BANKS = [
   { re: /(^|\.)vtb\.ru$/, name: 'ВТБ', color: '#0A2896' },
   { re: /(^|\.)(tbank|tinkoff|tb)\.ru$|(^|\.)tbank-online\.com$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'для клиентов Т-Банка' },
   { re: /(^|\.)alfabank\.ru$|(^|\.)alfa\.me$/, name: 'Альфа-Банк', color: '#EF3124' },
-  { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF', note: 'из любого банка по СБП' },
+  { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF', title: 'Перевод по СБП', note: 'из любого банка · через Озон Банк' },
   { re: /(^|\.)gazprombank\.ru$/, name: 'Газпромбанк', color: '#0F2D69' },
   { re: /(^|\.)yoomoney\.ru$/, name: 'ЮMoney', color: '#8B3FFD' },
 ];
@@ -286,7 +286,7 @@ function payLinks(c) { return String(c.pay_link || '').split(/\s+/).filter(Boole
 function bankButton(b) {
   return h('a.bankbtn', { href: b.url, target: '_blank', rel: 'noopener', style: `--bk:${b.color};--bkink:${b.ink || '#fff'}` },
     h('span.bankic.inv', b.name.replace(/^Т-/, 'Т').slice(0, 1)),
-    h('span.grow', h('b', 'Оплатить через ' + b.name), b.note ? h('span.small', b.note) : null), h('span.go', '↗'));
+    h('span.grow', h('b', b.title || 'Оплатить через ' + b.name), b.note ? h('span.small', b.note) : null), h('span.go', '↗'));
 }
 function bankIcon(b) {
   return h('span.bankic', { style: `background:${b.color};color:${b.ink || '#fff'}` }, b.name.replace(/^Т-/, 'Т').slice(0, 1));
