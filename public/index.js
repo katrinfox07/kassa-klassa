@@ -68,7 +68,7 @@ function payDialog(c) {
   sel.addEventListener('change', () => { const d = sel.selectedOptions[0]?.dataset.debt; amount.value = d || c.amount || ''; });
   const payer = h('input', { placeholder: 'Например: мама, Анна', maxlength: 120 });
   const file = h('input', { type: 'file', accept: 'image/*' });
-  const btn = h('button.btn.primary.block', { type: 'submit' }, 'Отправить казначею');
+  const btn = h('button.btn.primary.block', { type: 'submit' }, 'Отправить');
   const form = h('form.form', {
     onsubmit: async e => {
       e.preventDefault();
@@ -78,7 +78,7 @@ function payDialog(c) {
         await api('POST', '/api/report-payment', { collection_id: c.id, student_id: sel.value, amount: amount.value, payer: payer.value, image });
         close(); toast('Спасибо! Казначей подтвердит оплату.'); if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';
 load();
-      } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = 'Отправить казначею'; }
+      } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = 'Отправить'; }
     },
   },
     h('label.field', 'За кого', sel),
