@@ -92,7 +92,7 @@ function collectionAdminCard(c) {
   const det = h('details.more', { open: openColl.has(c.id), ontoggle: e => e.target.open ? openColl.add(c.id) : openColl.delete(c.id) },
     h('summary', 'Таблица оплат'), collectionTable(c));
   return h('section.card.coll',
-    h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), c.closed ? h('span.pill', 'завершён') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
+    h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), c.closed ? h('span.pill.ok', '✓ закрыт') : c.due_date ? h('span.pill.blue', 'до ' + fdate(c.due_date)) : null),
     h('div.meta', (c.amount ? rub(c.amount) + ' с ребёнка' : 'Сумма свободная') + (c.pay_link ? '' : ' · ⚠ нет ссылки на оплату')),
     progress(c),
     h('div.row.between.small', h('span', `Сдали полностью ${paid} из ${active.length}`,
@@ -101,6 +101,7 @@ function collectionAdminCard(c) {
     h('div.row', { style: 'margin-top:10px' },
       h('button.btn.small', { onclick: () => collectionDialog(c) }, 'Изменить'),
       h('button.btn.small', { onclick: () => remind(c) }, 'Текст для чата'),
+      h('button.btn.small', { onclick: act(() => api('PUT', '/api/admin/collections/' + c.id, { ...c, closed: !c.closed }), c.closed ? 'Сбор снова открыт' : 'Сбор закрыт') }, c.closed ? '↺ Открыть снова' : '✓ Закрыть сбор'),
       c.pay_link ? h('a.btn.small', { href: c.pay_link, target: '_blank', rel: 'noopener' }, 'Ссылка сбора ↗') : null),
     det);
 }
@@ -166,7 +167,7 @@ function collectionDialog(c) {
     h('label.field', 'Ссылка на банковский сбор', f.pay_link,
       h('span.hint', 'Создайте сбор в приложении своего банка и вставьте сюда ссылку на него. По ней родители оплатят с карты любого банка или по СБП.')),
     h('label.field', 'Описание', f.description),
-    !isNew ? h('label.check', f.closed, 'Сбор завершён (кнопка оплаты скроется)') : null,
+    !isNew ? h('label.check', f.closed, 'Сбор закрыт (кнопка оплаты у родителей скроется)') : null,
     h('div.row.between',
       h('button.btn.primary', { type: 'submit' }, 'Сохранить'),
       !isNew ? h('button.linklike.danger-text', { type: 'button', onclick: async () => {

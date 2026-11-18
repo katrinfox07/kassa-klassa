@@ -41,7 +41,7 @@ function collectionCard(c) {
   const paid = kids.filter(k => k.st.s === 'paid').length;
   const dl = c.due_date ? daysLeft(c.due_date) : null;
   const due = c.due_date ? h('span.pill' + (c.closed ? '' : dl < 0 ? '.bad' : dl <= 3 ? '.warn' : '.blue'),
-    c.closed ? 'завершён' : dl < 0 ? 'срок прошёл' : dl === 0 ? 'до сегодня' : 'до ' + fdate(c.due_date)) : c.closed ? h('span.pill', 'завершён') : null;
+    c.closed ? 'закрыт' : dl < 0 ? 'срок прошёл' : dl === 0 ? 'до сегодня' : 'до ' + fdate(c.due_date)) : c.closed ? h('span.pill.ok', '✓ закрыт') : null;
   return h('section.card.coll',
     h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), due),
     h('div.meta', c.amount ? `${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
