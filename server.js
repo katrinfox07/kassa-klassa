@@ -67,6 +67,36 @@ CREATE INDEX IF NOT EXISTS i_pay ON payments(class_id);
 CREATE INDEX IF NOT EXISTS i_exp ON expenses(class_id);
 `);
 const q = (sql) => db.prepare(sql);
+// миграция: полные данные ученика (видны только казначею)
+for (const col of ['full_name', 'birth', 'parent']) {
+  try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
+}
+// Строка из таблицы: «ФИО ребёнка [tab] дата рождения [tab] ФИО родителя» (или через пробелы)
+function parseStudent(line) {
+  let cells = String(line).split('\t').map(x => x.trim()).filter(Boolean);
+  if (cells.length && /^\d+[.)]?$/.test(cells[0])) cells.shift();
+  if (cells.length === 1) cells[0] = cells[0].replace(/^\s*\d+[.)]\s*/, '');
+  let birth = '';
+  const dre = /(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})|(\d{4})-(\d{2})-(\d{2})/;
+  cells = cells.map(c => {
+    const m = dre.exec(c);
+    if (m && !birth) {
+      birth = m[4] ? `${m[6]}.${m[5]}.${m[4]}` : `${m[1].padStart(2, '0')}.${m[2].padStart(2, '0')}.${m[3].length === 2 ? '20' + m[3] : m[3]}`;
+      c = c.replace(m[0], ' ').trim();
+    }
+    return c.replace(/\s+/g, ' ');
+  }).filter(c => /[A-Za-zА-Яа-яЁё]{2}/.test(c));
+  let full = cells[0] || '', parent = cells.slice(1).join(', ');
+  if (cells.length === 1) {
+    const w = full.split(' ');
+    if (w.length >= 5) { full = w.slice(0, 3).join(' '); parent = w.slice(3).join(' '); }
+  }
+  full = full.slice(0, 160); parent = parent.slice(0, 200);
+  const name = full.split(' ').slice(0, 2).join(' ').slice(0, 120);
+  return name ? { name, full, birth, parent } : null;
+}
+const insStudent = (cid, st, sort) => q('INSERT INTO students(class_id, name, full_name, birth, parent, sort) VALUES(?,?,?,?,?,?)')
+  .run(cid, st.name, st.full, st.birth, st.parent, sort);
 
 const DEFAULT_INFO = {
   announcements: [],
@@ -149,7 +179,7 @@ function freeSlug(base) {
 // ---------- Данные класса ----------
 function classState(c, admin) {
   const cid = c.id;
-  const students = q('SELECT id, name, active FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
+  const students = q('SELECT id, name, full_name, birth, parent, active FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
   const collections = q('SELECT * FROM collections WHERE class_id=? ORDER BY closed, COALESCE(due_date, created_at) DESC, id DESC').all(cid);
   const payments = q(`SELECT id, collection_id, student_id, amount, status, payer, note, source, created_at, decided_at,
     screenshot IS NOT NULL AS has_shot FROM payments WHERE class_id=? AND (status != 'rejected' OR ?) ORDER BY created_at DESC`).all(cid, admin ? 1 : 0);
@@ -239,9 +269,7 @@ route('POST', '/api/classes', (req, res, b, p, u) => {
   const cid = r.lastInsertRowid;
   setSetting(cid, 'class', { treasurer: u.name || '', payHint: '' });
   setSetting(cid, 'info', DEFAULT_INFO);
-  const names = String(b.students || '').split('\n').map(s => str(s.replace(/^\s*\d+[.)\s]+/, ''), 120)).filter(Boolean).slice(0, 60);
-  const ins = q('INSERT INTO students(class_id, name, sort) VALUES(?,?,?)');
-  names.forEach((n, i) => ins.run(cid, n, i));
+  String(b.students || '').split('\n').map(parseStudent).filter(Boolean).slice(0, 60).forEach((st, i) => insStudent(cid, st, i));
   send(res, 200, { ok: true, slug });
 }, { auth: true });
 
@@ -275,17 +303,18 @@ route('GET', '/admin/shot/:id', (req, res, b, p, u, c) => {
 }, A);
 
 route('POST', '/admin/students', (req, res, b, p, u, c) => {
-  const names = String(b.names || '').split('\n').map(s => str(s, 120)).filter(Boolean);
+  const names = String(b.names || '').split('\n').map(parseStudent).filter(Boolean);
   if (!names.length) bad('Введите имя');
   if (q('SELECT COUNT(*) n FROM students WHERE class_id=?').get(c.id).n + names.length > 80) bad('Слишком много учеников');
   const max = q('SELECT COALESCE(MAX(sort),0) m FROM students WHERE class_id=?').get(c.id).m;
-  const ins = q('INSERT INTO students(class_id, name, sort) VALUES(?,?,?)');
-  names.forEach((n, i) => ins.run(c.id, n, max + i + 1));
+  names.forEach((st, i) => insStudent(c.id, st, max + i + 1));
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/students/:id', (req, res, b, p, u, c) => {
-  const name = str(b.name, 120); if (!name) bad('Введите имя');
-  q('UPDATE students SET name=?, active=? WHERE id=? AND class_id=?').run(name, b.active ? 1 : 0, int(p.id), c.id);
+  const full = str(b.full_name || b.name, 160).replace(/\s+/g, ' ');
+  const name = full.split(' ').slice(0, 2).join(' '); if (!name) bad('Введите имя');
+  q('UPDATE students SET name=?, full_name=?, birth=?, parent=?, active=? WHERE id=? AND class_id=?')
+    .run(name, full, str(b.birth, 20), str(b.parent, 200), b.active ? 1 : 0, int(p.id), c.id);
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/students/:id', (req, res, b, p, u, c) => {

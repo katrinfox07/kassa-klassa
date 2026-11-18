@@ -231,14 +231,19 @@ function expenseDialog() {
 
 // ---------- Список класса ----------
 VIEWS['класс'] = () => {
-  const ta = h('textarea', { rows: 3, placeholder: 'Фамилия Имя — по одному на строку' });
+  const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя — по одному на строку (можно вставить из таблицы)' });
+  const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, active: s.active, ...patch });
   return h('div.stack',
-    h('section.card', h('p.hint', 'На странице для родителей видны только эти имена. Выбывших лучше отмечать, а не удалять: так сохранится история оплат.'),
-      h('div.tbl-scroll', h('table.tbl', h('tbody', S.students.map((s, i) => {
-        const name = h('input', { value: s.name, maxlength: 120, onchange: act(() => api('PUT', '/api/admin/students/' + s.id, { name: name.value, active: s.active }), 'Сохранено') });
-        return h('tr', { class: s.active ? '' : 'out' }, h('td.muted.small', i + 1), h('td', name),
+    h('section.card', h('p.hint', 'Полные данные видите только вы. Родителям показываются только фамилия и имя. Выбывших лучше отмечать, а не удалять: так сохранится история оплат.'),
+      h('div.tbl-scroll', h('table.tbl',
+        h('thead', h('tr', h('th', '№'), h('th', 'ФИО ребёнка'), h('th', 'Дата рождения'), h('th', 'Родитель'), h('th', ''))),
+        h('tbody', S.students.map((s, i) => {
+        const full = h('input', { value: s.full_name || s.name, maxlength: 160, onchange: act(() => save(s, { full_name: full.value }), 'Сохранено') });
+        const birth = h('input', { value: s.birth || '', maxlength: 20, placeholder: 'дд.мм.гггг', style: 'width:8.5em', onchange: act(() => save(s, { birth: birth.value }), 'Сохранено') });
+        const parent = h('input', { value: s.parent || '', maxlength: 200, onchange: act(() => save(s, { parent: parent.value }), 'Сохранено') });
+        return h('tr', { class: s.active ? '' : 'out' }, h('td.muted.small', i + 1), h('td', full), h('td', birth), h('td', parent),
           h('td', h('div.actions',
-            h('button.btn.small', { onclick: act(() => api('PUT', '/api/admin/students/' + s.id, { name: s.name, active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'),
+            h('button.btn.small', { onclick: act(() => save(s, { active: !s.active })) }, s.active ? 'Выбыл' : 'Вернуть'),
             h('button.icon-btn', { 'aria-label': 'Удалить', onclick: () => confirmInline(() => {}, `Удалить «${s.name}» из списка?`, async () => { await api('DELETE', '/api/admin/students/' + s.id); load(); }) }, '🗑'))));
       }))))),
     h('section.card.form', h('h3', 'Добавить детей'), ta,
