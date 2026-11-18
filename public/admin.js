@@ -169,7 +169,9 @@ function collectionDialog(c) {
     const row = h('div.linkrow', chip, inp, h('button.icon-btn', { type: 'button', 'aria-label': 'Убрать', onclick: () => row.remove() }, '✕'));
     links.append(row);
   };
-  const cur = String(c.pay_link || '').split(/\s+/).filter(Boolean);
+  // для нового сбора подставляем ссылки из последнего сбора, где они были (например, Озон по СБП)
+  const lastLinks = S.collections.slice().sort((a, b) => b.id - a.id).find(x => x.pay_link)?.pay_link || '';
+  const cur = String((isNew ? lastLinks : c.pay_link) || '').split(/\s+/).filter(Boolean);
   let qrRemove = false;
   const qrFile = h('input', { type: 'file', accept: 'image/*' });
   const qrBox = h('div', c.qr ? h('div.row', h('img', { src: '/uploads/' + c.qr, alt: 'QR', style: 'width:72px;height:72px;object-fit:contain;border-radius:8px;border:1px solid var(--line)' }),
