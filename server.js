@@ -466,10 +466,13 @@ route('POST', '/admin/payments', (req, res, b, p, u, c) => {
   if (!k || !s) bad('Не найден сбор или ребёнок');
   const amount = b.amount === undefined || b.amount === '' ? k.amount : int(b.amount);
   if (!(amount > 0)) bad('Укажите сумму');
-  const pend = q("SELECT id FROM payments WHERE collection_id=? AND student_id=? AND status='pending'").get(k.id, s.id);
-  if (pend) q("UPDATE payments SET status='confirmed', amount=?, decided_at=datetime('now') WHERE id=?").run(amount, pend.id);
-  else q("INSERT INTO payments(class_id, collection_id, student_id, amount, status, source, note, decided_at) VALUES(?,?,?,?,'confirmed','treasurer',?,datetime('now'))")
-    .run(c.id, k.id, s.id, amount, str(b.note, 300));
+  const shot = b.image ? saveImage(b.image, 'pay') : null;
+  const pend = q("SELECT id, screenshot FROM payments WHERE collection_id=? AND student_id=? AND status='pending'").get(k.id, s.id);
+  if (pend) {
+    if (shot) rmFile(pend.screenshot);
+    q("UPDATE payments SET status='confirmed', amount=?, screenshot=COALESCE(?, screenshot), decided_at=datetime('now') WHERE id=?").run(amount, shot, pend.id);
+  } else q("INSERT INTO payments(class_id, collection_id, student_id, amount, status, source, note, screenshot, decided_at) VALUES(?,?,?,?,'confirmed','treasurer',?,?,datetime('now'))")
+    .run(c.id, k.id, s.id, amount, str(b.note, 300), shot);
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/payments/:id', (req, res, b, p, u, c) => {

@@ -140,9 +140,13 @@ function collectionTable(c) {
 function markPaid(c, s, def) {
   const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: def || c.amount || '', required: true });
   const note = h('input', { placeholder: 'Например: наличными', maxlength: 300 });
+  const file = h('input', { type: 'file', accept: 'image/*' });
   const close = modal('Отметить оплату', h('form.form', {
-    onsubmit: async e => { e.preventDefault(); await act(() => api('POST', '/api/admin/payments', { collection_id: c.id, student_id: s.id, amount: amount.value, note: note.value }), 'Отмечено')(); close(); },
+    onsubmit: async e => { e.preventDefault(); e.submitter && (e.submitter.disabled = true);
+      const image = file.files[0] ? await compressImage(file.files[0]) : null;
+      await act(() => api('POST', '/api/admin/payments', { collection_id: c.id, student_id: s.id, amount: amount.value, note: note.value, image }), 'Отмечено')(); close(); },
   }, h('p', h('b', s.name), h('br'), h('span.muted', c.title)), h('label.field', 'Сумма, ₽', amount), h('label.field', 'Комментарий', note),
+     h('label.field', 'Чек или скриншот перевода (необязательно)', file),
      h('button.btn.primary', { type: 'submit' }, 'Сохранить')));
 }
 
