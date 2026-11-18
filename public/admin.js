@@ -208,7 +208,9 @@ function remind(c) {
   const notPaid = S.students.filter(s => s.active && statusOf(S, c, s.id).s === 'none').map(s => s.name);
   const debts = S.students.filter(s => s.active).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
   const url = classUrl();
-  const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount ? ` — ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
+  const ownPrices = /₽|руб/i.test(c.description || '');
+  const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount && !ownPrices ? ` — ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
+    (c.description ? c.description.trim() + '\n' : '') +
     payLinks(c).map(b => `Оплатить (${b.name}${b.note ? ', ' + b.note : ''}): ${b.url}\n`).join('') + `После оплаты отметьтесь, пожалуйста, на странице класса: ${url}\n` +
     (notPaid.length && notPaid.length < S.students.length ? `\nПока не сдали: ${notPaid.join(', ')}.` : '') +
     (debts.length ? `\nНужно доплатить: ${debts.join(', ')}.` : '');

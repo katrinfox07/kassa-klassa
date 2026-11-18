@@ -44,7 +44,7 @@ function collectionCard(c) {
     c.closed ? 'закрыт' : dl < 0 ? 'срок прошёл' : dl === 0 ? 'до сегодня' : 'до ' + fdate(c.due_date)) : c.closed ? h('span.pill.ok', '✓ закрыт') : null;
   return h('section.card.coll' + (c.closed ? '.closed' : ''),
     h('div.row.between', h('div.title.grow', c.title, c.separate ? h('span.pill.blue', { style: 'margin-left:6px' }, 'досбор') : null), due),
-    h('div.meta', c.amount ? `${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
+    /₽|руб/i.test(c.description || '') ? null : h('div.meta', c.amount ? `${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
     c.description ? h('p.pre', { style: 'margin-top:8px' }, c.description) : null,
     progress(c),
     h('div.row.between.small', h('span', `Сдали ${paid} из ${S.students.length}`, (n => n ? h('span.muted', ` · частично ${n}`) : null)(kids.filter(k => k.st.s === 'partial').length)), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
