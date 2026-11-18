@@ -7,7 +7,7 @@ async function load() {
   catch (e) { $('#main').replaceChildren(h('p.empty', 'Не удалось загрузить данные. Обновите страницу.')); return; }
   document.title = S.class.title;
   $('#title').textContent = S.class.title;
-  $('#sub').textContent = S.class.treasurer ? 'Казначей: ' + S.class.treasurer : '';
+  $('#sub').textContent = '';
   $('#install').replaceChildren(installButton() || '');
   $('#totals').replaceChildren(
     h('div.total', h('div.label', 'Собрано'), h('div.value', rub(S.totals.collected))),
