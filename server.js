@@ -86,6 +86,17 @@ if (!getSettingRaw('mig_photo_separate')) {
   db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото — 450%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_separate', '1')").run();
 }
+// исправление переноса 5Г: у троих «Внесено» было пусто; 1 400 ₽ — остаток прошлых сборов
+if (!getSettingRaw('mig_5g_fix')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  if (cl) {
+    const k = q("SELECT id FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
+    if (k) for (const n of ['Бембель Михаил', 'Гордеева Дарья', 'Павлюченко Полина'])
+      q("DELETE FROM payments WHERE collection_id=? AND source='treasurer' AND student_id=(SELECT id FROM students WHERE class_id=? AND name=?)").run(k.id, cl.id, n);
+    q("INSERT INTO class_settings(class_id,key,value) VALUES(?,?,?) ON CONFLICT(class_id,key) DO NOTHING").run(cl.id, 'opening', JSON.stringify({ amount: 1400, note: 'Остаток прошлых сборов' }));
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_fix', '1')").run();
+}
 // убрать служебную пометку после переноса из таблицы
 db.exec(`UPDATE collections SET description = trim(replace(replace(description, ' Перенесено из таблицы.', ''), 'Перенесено из таблицы.', '')) WHERE description LIKE '%Перенесено из таблицы.%'`);
 // Строка из таблицы: «ФИО ребёнка [tab] дата рождения [tab] ФИО родителя» (или через пробелы)
@@ -205,7 +216,8 @@ function classState(c, admin) {
   const receipts = q('SELECT r.expense_id, r.file FROM receipts r JOIN expenses e ON e.id=r.expense_id WHERE e.class_id=? ORDER BY r.id').all(cid);
   for (const e of expenses) e.receipts = receipts.filter(r => r.expense_id === e.id).map(r => '/uploads/' + r.file);
   const sep = new Set(collections.filter(k => k.separate).map(k => k.id));
-  const collected = payments.filter(p => p.status === 'confirmed' && !sep.has(p.collection_id)).reduce((s, p) => s + p.amount, 0);
+  const opening = getSetting(cid, 'opening', { amount: 0, note: '' });
+  const collected = (opening.amount || 0) + payments.filter(p => p.status === 'confirmed' && !sep.has(p.collection_id)).reduce((s, p) => s + p.amount, 0);
   const spent = expenses.filter(e => !sep.has(e.collection_id)).reduce((s, e) => s + e.amount, 0);
   const activeCount = students.filter(s => s.active).length;
   for (const k of collections) {
@@ -223,6 +235,7 @@ function classState(c, admin) {
     collections,
     payments: admin ? payments : payments.map(p => ({ collection_id: p.collection_id, student_id: p.student_id, amount: p.amount, status: p.status })),
     expenses,
+    opening,
     totals: { collected, spent, balance: collected - spent },
   };
 }
@@ -430,6 +443,7 @@ route('PUT', '/admin/class', (req, res, b, p, u, c) => {
   const title = str(b.title, 100) || c.title;
   q('UPDATE classes SET title=? WHERE id=?').run(title, c.id);
   setSetting(c.id, 'class', { treasurer: str(b.treasurer, 100), payHint: str(b.payHint, 1000) });
+  if (b.opening !== undefined) setSetting(c.id, 'opening', { amount: Math.max(0, int(b.opening) || 0), note: str(b.openingNote, 200) });
   send(res, 200, { ok: true });
 }, W);
 route('GET', '/admin/export', (req, res, b, p, u, c) => send(res, 200, classState(c, true), {
