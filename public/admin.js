@@ -375,8 +375,12 @@ VIEWS['инфо'] = () => {
 };
 
 // ---------- Календарь ----------
-VIEWS['календарь'] = () => h('div.stack', calendarCard(S, true),
-  h('p.hint', 'Дни рождения детей берутся из «Списка класса», учителей — из «Информации». Родители видят дни рождения, только если включить это в «Настройках».'));
+VIEWS['календарь'] = () => h('div.stack',
+  h('label.check.card', { style: 'padding:10px 14px' }, h('input', { type: 'checkbox', checked: !!S.class.showBirthdays,
+    onchange: act(e => api('PUT', '/api/admin/class', { title: S.class.title, treasurer: S.class.treasurer || '', payHint: S.class.payHint || '', showBirthdays: e.target.checked }), 'Сохранено') }),
+    'Показывать родителям дни рождения детей (без года)'),
+  calendarCard(S, true),
+  h('p.hint', 'Дни рождения детей берутся из «Списка класса», учителей — из «Информации».'));
 
 // ---------- Настройки ----------
 VIEWS['настройки'] = () => {
