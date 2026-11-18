@@ -16,6 +16,7 @@ async function load() {
   tabs($('#tabs'), [
     { id: 'сборы', label: 'Сборы' },
     { id: 'расходы', label: 'Расходы и чеки' },
+    { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
   ], show);
 }
@@ -24,6 +25,8 @@ function show(id) {
   const m = $('#main');
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
+  if (id === 'класс') m.replaceChildren(h('section.card', h('div.row.between', h('h3', 'Список класса'), h('span.muted.small', S.students.length + ' детей')),
+    h('ol.classlist', S.students.map(s => h('li', s.name)))));
   if (id === 'инфо') m.replaceChildren(renderInfo(S.info));
 }
 

@@ -531,3 +531,6 @@ div.field .linklike { justify-self: start; }
 /* строки с долгом без подсветки — достаточно оранжевой плашки */
 .tbl tr.debt td, .tbl tr.debt td:first-child, .tbl tr.debt td:last-child { background: none; box-shadow: none; border-radius: 0; font-weight: inherit; }
 .tbl tr.debt .pill.bad { background: var(--orange-soft); color: var(--orange); }
+.classlist { margin: 6px 0 0; padding-left: 28px; columns: 2 220px; column-gap: 24px; }
+.classlist li { padding: 5px 0; border-bottom: 1px dashed var(--line); break-inside: avoid; }
+.classlist li::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
