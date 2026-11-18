@@ -50,12 +50,11 @@ function collectionCard(c) {
     h('div.row.between.small', h('span', `Сдали ${paid} из ${S.students.length}`), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
     !c.closed ? h('div.row', { style: 'margin-top:12px' }, h('button.btn.primary.grow', { onclick: () => payDialog(c) }, 'Оплатить')) : null,
     h('details.more', h('summary', 'Кто сдал'),
-      h('ul.kids', kids.map(({ s, st }) => h('li', h('span.name', s.name),
-        st.s === 'paid' ? h('span.dot.paid', { title: 'Оплачено' }, '✓') :
-        st.s === 'partial' ? h('span.pill.bad', { title: 'Оплачено ' + rub(st.amount) }, 'долг ' + rub(st.debt)) :
-        st.s === 'pending' ? h('span.dot.pending', { title: 'Ждёт подтверждения казначея' }, '…') :
-        h('span.dot.none', { title: 'Не оплачено' }, '–')))),
-      h('p.hint', { style: 'margin-top:8px' }, '✓ оплачено   … ждёт подтверждения   – не оплачено   «долг» — оплачено не полностью')));
+      h('ul.kids', kids.map(({ s, st }) => h('li.' + st.s,
+        h('span.ic', st.s === 'paid' ? '✓' : st.s === 'pending' ? '…' : st.s === 'partial' ? '!' : '✕'),
+        h('span.name', s.name),
+        st.s === 'partial' ? h('span.debt', '−' + rub(st.debt)) : st.s === 'pending' ? h('span.debt', 'проверка') : null))),
+      h('p.hint', { style: 'margin-top:8px' }, 'Зелёный — оплачено, красный — не оплачено или долг (сумма долга рядом), жёлтый — ждёт подтверждения.')));
 }
 
 function payDialog(c) {

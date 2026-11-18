@@ -233,3 +233,23 @@ header.top.hero a { color: #fff; }
 .tbl tr.debt td:first-child { border-radius: 10px 0 0 10px; box-shadow: inset 4px 0 0 var(--bad); font-weight: 700; }
 .tbl tr.debt td:last-child { border-radius: 0 10px 10px 0; }
 .kids li .pill.bad { font-size: 11px; }
+
+/* Кто сдал: компактные цветные плашки */
+.kids { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 10px; }
+.kids li { border: 0; padding: 6px 10px; border-radius: 10px; font-size: 14px; justify-content: flex-start; gap: 8px; line-height: 1.25; }
+.kids li .name { flex: 1; }
+.kids li .ic { flex: none; width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; }
+.kids li.paid { background: var(--ok-soft); } .kids li.paid .ic { background: var(--ok); }
+.kids li.none { background: var(--bad-soft); } .kids li.none .ic { background: var(--bad); }
+.kids li.partial { background: var(--bad-soft); } .kids li.partial .ic { background: var(--bad); }
+.kids li.pending { background: var(--sun-soft); } .kids li.pending .ic { background: var(--sun); }
+.kids li .debt { font-size: 12px; font-weight: 800; color: var(--bad); white-space: nowrap; }
+.kids li.pending .debt { color: var(--warn); }
+@media (max-width: 480px) { .kids { grid-template-columns: 1fr 1fr; } .kids li { font-size: 13px; padding: 5px 8px; } }
+/* Плотнее */
+.card { padding: 14px 16px; }
+.stack { gap: 10px; }
+.tbl td, .tbl th { padding: 5px 6px; }
+.tbl .btn.small { min-height: 30px; padding: 4px 9px; font-size: 13px; }
+.tbl .pill { font-size: 12px; }
+.coll .progress { margin: 8px 0 4px; }
