@@ -603,7 +603,9 @@ VIEWS['учебники'] = () => {
     h('button.btn.small', { onclick: () => { const close = modal('Название', h('form.form', { onsubmit: async e => { e.preventDefault(); await act(() => api('PUT', '/api/admin/books/' + b.id, { title: e.target.t.value }), 'Сохранено')(); close(); } },
       h('input', { name: 't', value: b.title, maxlength: 120 }), h('button.btn.primary', { type: 'submit' }, 'Сохранить'))); } }, '✎'),
     h('button.btn.small.danger', { onclick: () => confirmInline(() => {}, `Удалить учебник «${b.title}»?`, async () => { await api('DELETE', '/api/admin/books/' + b.id); toast('Удалено'); load(); }) }, '✕')));
+  const ready = S.books.filter(b => b.status === 'ready');
   return h('div.stack.books-admin',
+    ready.length ? h('section.card', h('h3', '📖 Читать'), h('p.small.muted', 'Так учебники видят родители. Нажмите на обложку, чтобы листать.'), booksGrid(ready)) : null,
     h('section.card', h('h3', '📚 Учебники'), rows.length ? h('div.stack', rows) : h('p.muted', 'Пока пусто. Загрузите первый учебник ниже.')),
     h('section.card', h('h3', 'Добавить учебник'), form));
 };
