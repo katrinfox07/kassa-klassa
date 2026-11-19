@@ -488,19 +488,63 @@ function openReader(b) {
   const go = n => { page = Math.min(N, Math.max(1, n | 0)); render(); };
   const setZoom = z => { zoom = z; zl.textContent = Math.round(zoom * 100) + '%'; size(); };
 
-  // свайп и нажатия по краям
-  let sx = null, sy = 0, st = 0;
-  view.addEventListener('pointerdown', e => { if (zoom > 1 || e.target.closest('button')) return; sx = e.clientX; sy = e.clientY; st = Date.now(); });
-  view.addEventListener('pointerup', e => {
-    if (sx === null) return;
-    const dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) return flip(dx < 0 ? 1 : -1);
-    if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && Date.now() - st < 400) {
-      const r = view.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
-      if (x < .3) flip(-1); else if (x > .7) flip(1);
+  // жесты: свайп, тап по краю, двойной тап и щипок двумя пальцами для увеличения
+  const zoomAt = (z, cx, cy) => {
+    z = Math.min(4, Math.max(1, z));
+    const r = stage.getBoundingClientRect();
+    const fx = (stage.scrollLeft + (cx ?? r.left + r.width / 2) - r.left) / (stage.scrollWidth || 1);
+    const fy = (stage.scrollTop + (cy ?? r.top + r.height / 2) - r.top) / (stage.scrollHeight || 1);
+    setZoom(z);
+    stage.scrollLeft = fx * stage.scrollWidth - ((cx ?? r.left + r.width / 2) - r.left);
+    stage.scrollTop = fy * stage.scrollHeight - ((cy ?? r.top + r.height / 2) - r.top);
+  };
+  const pts = new Map();
+  let sx = null, sy = 0, st = 0, lastTap = 0, tapTimer = null, pinch = null, pan = null;
+  view.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [a, c] = [...pts.values()];
+      pinch = { d: Math.hypot(a.x - c.x, a.y - c.y), z: zoom, cx: (a.x + c.x) / 2, cy: (a.y + c.y) / 2 };
+      sx = null; pan = null; clearTimeout(tapTimer);
+      return;
+    }
+    sx = e.clientX; sy = e.clientY; st = Date.now(); pan = { x: e.clientX, y: e.clientY };
+  });
+  view.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pts.size >= 2) {
+      e.preventDefault();
+      const [a, c] = [...pts.values()];
+      const z = pinch.z * Math.hypot(a.x - c.x, a.y - c.y) / (pinch.d || 1);
+      if (Math.abs(z - zoom) > .04) zoomAt(z, pinch.cx, pinch.cy);
+    } else if (zoom > 1 && pts.size === 1 && pan) { // двигаем увеличенную страницу пальцем
+      stage.scrollLeft -= e.clientX - pan.x; stage.scrollTop -= e.clientY - pan.y; pan = { x: e.clientX, y: e.clientY };
     }
   });
-  view.addEventListener('dblclick', () => setZoom(zoom > 1 ? 1 : 2));
+  const up = e => {
+    pts.delete(e.pointerId); pan = null;
+    if (pinch) { if (pts.size < 2) { pinch = null; if (zoom < 1.08) setZoom(1); } return; }
+    if (sx === null || e.type === 'pointercancel') { sx = null; return; }
+    const dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
+    if (zoom === 1 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) return flip(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - st < 400) {
+      const now = Date.now(), cx = e.clientX, cy = e.clientY;
+      if (now - lastTap < 320) { // двойной тап
+        clearTimeout(tapTimer); lastTap = 0;
+        zoomAt(zoom > 1 ? 1 : 2.5, cx, cy);
+        return;
+      }
+      lastTap = now;
+      if (zoom > 1) return;
+      const r = view.getBoundingClientRect(), x = (cx - r.left) / r.width;
+      tapTimer = setTimeout(() => { if (x < .3) flip(-1); else if (x > .7) flip(1); }, 300);
+    }
+  };
+  view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);
+  view.addEventListener('dblclick', e => e.preventDefault());
+  view.addEventListener('wheel', e => { if (e.ctrlKey) { e.preventDefault(); zoomAt(zoom * (e.deltaY < 0 ? 1.15 : 0.87), e.clientX, e.clientY); } }, { passive: false });
 
   cnt.addEventListener('change', () => go(+cnt.value));
   const close = () => { wrap.remove(); document.body.classList.remove('noscroll'); removeEventListener('resize', onResize); document.removeEventListener('keydown', onKey); };
@@ -516,8 +560,8 @@ function openReader(b) {
       h('button.icon-btn', { onclick: close, 'aria-label': 'Закрыть' }, '✕'),
       h('b.rd-title', b.title),
       h('span.rd-pg', cnt, h('span', ' / ' + N)),
-      h('span.rd-zoom', h('button.icon-btn', { onclick: () => setZoom(Math.max(1, zoom - .5)), 'aria-label': 'Мельче' }, '−'), zl,
-        h('button.icon-btn', { onclick: () => setZoom(Math.min(3, zoom + .5)), 'aria-label': 'Крупнее' }, '+'))),
+      h('span.rd-zoom', h('button.icon-btn', { onclick: () => zoomAt(zoom - .5), 'aria-label': 'Мельче' }, '−'), zl,
+        h('button.icon-btn', { onclick: () => zoomAt(zoom + .5), 'aria-label': 'Крупнее' }, '+'))),
     view);
   document.body.append(wrap); document.body.classList.add('noscroll');
   addEventListener('resize', onResize); document.addEventListener('keydown', onKey);

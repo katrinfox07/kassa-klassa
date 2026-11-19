@@ -659,9 +659,9 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .books-admin .book img { pointer-events: none; -webkit-user-drag: none; }
 .books-admin .books.sorting .book { touch-action: none; }
 /* Читалка-книга */
-.fp-view { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
+.fp-view { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; touch-action: none; user-select: none; -webkit-user-select: none; }
 .fp-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
-.fp-stage.zoomed { overflow: auto; align-items: flex-start; justify-content: flex-start; touch-action: auto; }
+.fp-stage.zoomed { overflow: auto; align-items: flex-start; justify-content: flex-start; touch-action: none; }
 .fp-stage.zoomed .fp-book { margin: auto; }
 .fp-book { position: relative; display: flex; flex: none; perspective: 2200px; }
 .fp-half { position: relative; width: 100%; height: 100%; }
@@ -693,3 +693,4 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .fp-nav.prev { left: 8px; } .fp-nav.next { right: 8px; }
 @media (max-width: 760px) { .fp-nav { width: 34px; height: 52px; font-size: 28px; background: rgba(0,0,0,.25); } }
 @media (prefers-reduced-motion: reduce) { .fp-leaf, .fp-leaf.single { transition: none; } }
+.fp-view:has(.fp-stage.zoomed) .fp-nav { opacity: 0; pointer-events: none; }
