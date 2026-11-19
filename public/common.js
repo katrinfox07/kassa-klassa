@@ -171,19 +171,19 @@ function scheduleCard(info) {
     const n = days.length ? lessons.length : bells.length;
     const todayOn = days.length ? isToday : now.getDay() % 6;
     const isEmpty = i => days.length && (!lessons[i] || /^[–-]+$/.test(lessons[i]));
-    let first = 0; while (first < n && isEmpty(first)) first++; // пустые первые уроки не показываем
+    let first = 0; while (first < n && isEmpty(first)) first++;
     const real = [...Array(n).keys()].filter(i => !isEmpty(i));
     const rows = [];
     let k = 0; const st = () => ({ style: `--i:${k++}` });
-    for (let i = first; i < n; i++) {
+    for (let i = 0; i < n; i++) {
       const b = bells[i] || {}, subj = days.length ? lessons[i] : '', empty = isEmpty(i);
       const from = toM(b.from), to = toM(b.to);
       const live = todayOn && b.from && mins >= from && mins < to, past = todayOn && b.to && mins >= to;
       const pct = live ? Math.round((mins - from) / (to - from) * 100) : 0;
       rows.push(h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : '') + (past && !empty ? '.past' : ''), st(),
-        h('span.ln', past && !empty ? '✓' : i + 1),
+        h('span.ln', past ? '✓' : i + 1),
         h('span.lt', b.from ? h('b', b.from) : '', b.to ? h('small', b.to) : ''),
-        h('span.ls', days.length ? (empty ? 'окно' : subj) : ''),
+        h('span.ls', days.length ? (empty ? (i < first ? 'нет урока' : 'окно') : subj) : ''),
         live ? h('span.lleft', h('i.pdot'), 'ещё ' + left(to - mins)) : h('span'),
         live ? h('div.lbar', h('div', { style: `width:${pct}%` })) : null));
       const nb = bells[i + 1];
@@ -204,6 +204,12 @@ function scheduleCard(info) {
         first > 0 ? h('span.sched-late', `с ${first + 1}-го урока`) : null,
         isToday && endM && mins >= endM ? h('span.sched-done', 'уроки закончились') : null].filter(Boolean));
     } else sum.replaceChildren(days.length ? h('span', 'уроков нет') : '');
+    const fb0 = real.length && bells[real[0]];
+    if (todayOn && days.length && fb0?.from && mins < toM(fb0.from)) {
+      const wait = toM(fb0.from) - mins;
+      rows.unshift(h('div.sched-wait', { style: '--i:0' }, h('i.pdot'), h('span', 'До начала уроков ', h('b', 'ещё ' + left(wait))),
+        h('span.sched-wait-t', `${first + 1}-й урок в ${fb0.from}`)));
+    }
     list.replaceChildren(...rows);
     list.classList.toggle('anim', !!anim);
   };
