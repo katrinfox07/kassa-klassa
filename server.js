@@ -859,6 +859,23 @@ function sendManifest(res, { name, short, start, id }) {
 const SIGNUP_OPEN = process.env.SIGNUP === 'open'; // пока сервис закрыт: без регистрации и рекламы на главной
 const PAGES = { '/': SIGNUP_OPEN ? 'landing.html' : 'soon.html', '/account': 'account.html', '/owner': 'owner.html', '/oferta': 'oferta.html', '/privacy': 'privacy.html' };
 
+
+// --- Закрываем сайт от поисковиков, ИИ-ботов и скриптов ---
+const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|scrap|GPTBot|ChatGPT|OAI-SearchBot|Claude|anthropic|CCBot|Google-Extended|Googlebot|Gemini|PerplexityBot|Perplexity|Bytespider|Amazonbot|Applebot|YandexBot|YandexImages|YandexAdditional|bingbot|DuckDuck|Baiduspider|Sogou|Exabot|SemrushBot|AhrefsBot|MJ12bot|DotBot|PetalBot|Diffbot|Omgili|ImagesiftBot|cohere|YouBot|Timpibot|Meta-ExternalAgent|FacebookBot|DataForSeo|python-requests|python-urllib|aiohttp|httpx|scrapy|curl\/|wget|Go-http-client|okhttp|libwww|HeadlessChrome|PhantomJS|axios|node-fetch|java\//i;
+// превью ссылок в мессенджерах оставляем (только заголовок страницы)
+const PREVIEW_UA = /TelegramBot|WhatsApp|vkShare|MAX|OdklBot|Viber|Slackbot|Discordbot/i;
+const ROBOTS_TXT = 'User-agent: *\nDisallow: /\n\n' + ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'Claude-Web', 'Claude-User', 'anthropic-ai', 'CCBot', 'Google-Extended', 'Googlebot', 'PerplexityBot', 'Bytespider', 'Amazonbot', 'Applebot-Extended', 'YandexBot', 'YandexAdditional', 'Bingbot', 'Meta-ExternalAgent', 'cohere-ai']
+  .map(b => `User-agent: ${b}\nDisallow: /\n`).join('\n');
+const hitMap = new Map();
+setInterval(() => hitMap.clear(), 60e3).unref?.();
+function guard(req, res) {
+  const ua = String(req.headers['user-agent'] || '');
+  if (!ua.trim() || (BOT_UA.test(ua) && !PREVIEW_UA.test(ua))) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Доступ закрыт'); return false; }
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  const n = (hitMap.get(ip) || 0) + 1; hitMap.set(ip, n);
+  if (n > 600) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' }); res.end('Слишком много запросов, подождите минуту'); return false; }
+  return true;
+}
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   let p;
@@ -866,6 +883,9 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai');
+  if (p === '/robots.txt') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(ROBOTS_TXT); }
+  if (!guard(req, res)) return;
   try {
     if (p.startsWith('/api/')) {
       for (const r of routes) {
