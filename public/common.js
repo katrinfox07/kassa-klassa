@@ -281,21 +281,23 @@ function expRow(e, coll, extra) {
 // ---------- Поле для фото: перетащите файлы или нажмите, с миниатюрами ----------
 function enhanceFileInput(inp) {
   if (inp.dataset.dz) return; inp.dataset.dz = '1';
-  const multi = inp.multiple;
-  const text = h('div.dz-text', h('b', multi ? 'Перетащите фото сюда' : 'Перетащите фото сюда'), h('span', 'или нажмите, чтобы выбрать' + (isIOS() || /android/i.test(navigator.userAgent) ? ' / сфотографировать' : '')));
+  const multi = inp.multiple, isPdf = /pdf/.test(inp.accept || '');
+  const empty = isPdf ? 'Перетащите PDF сюда' : 'Перетащите фото сюда';
+  const text = h('div.dz-text', h('b', empty), h('span', 'или нажмите, чтобы выбрать' + (!isPdf && (isIOS() || /android/i.test(navigator.userAgent)) ? ' / сфотографировать' : '')));
   const previews = h('div.dz-previews');
-  const zone = h('div.dropzone', h('div.dz-icon', '📷'), text, previews);
+  const zone = h('div.dropzone', h('div.dz-icon', isPdf ? '📄' : '📷'), text, previews);
   inp.replaceWith(zone); zone.prepend(inp);
   const show = () => {
+    if (isPdf) { previews.replaceChildren(); zone.classList.toggle('has', inp.files.length > 0); text.firstChild.textContent = inp.files[0] ? `${inp.files[0].name} (${Math.round(inp.files[0].size / 1048576)} МБ)` : empty; return; }
     previews.replaceChildren(...[...inp.files].map(f => { const u = URL.createObjectURL(f); return h('img', { src: u, alt: f.name, onload: () => URL.revokeObjectURL(u) }); }));
     zone.classList.toggle('has', inp.files.length > 0);
-    text.firstChild.textContent = inp.files.length ? `Выбрано: ${inp.files.length}` : 'Перетащите фото сюда';
+    text.firstChild.textContent = inp.files.length ? `Выбрано: ${inp.files.length}` : empty;
   };
   inp.addEventListener('change', show);
   ['dragenter', 'dragover'].forEach(t => zone.addEventListener(t, e => { e.preventDefault(); zone.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(t => zone.addEventListener(t, e => { e.preventDefault(); zone.classList.remove('over'); }));
   zone.addEventListener('drop', e => {
-    const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')); if (!files.length) return;
+    const files = [...e.dataTransfer.files].filter(f => isPdf ? f.type === 'application/pdf' : f.type.startsWith('image/')); if (!files.length) return;
     const dt = new DataTransfer();
     if (multi) [...inp.files].forEach(f => dt.items.add(f));
     (multi ? files : files.slice(0, 1)).forEach(f => dt.items.add(f));
@@ -409,4 +411,43 @@ function parentRows(s) {
     const ph = off >= 0 ? phones[i - off] : phones[i];
     return h('div.prow', h('span', names[i] || ''), ph ? call(ph) : null);
   }));
+}
+
+// ---------- Учебники: обложки и читалка ----------
+function booksGrid(books, onOpen) {
+  if (!books.length) return h('p.muted', 'Учебников пока нет.');
+  return h('div.books', books.map(b => h('button.book', { type: 'button', onclick: () => (onOpen || openReader)(b) },
+    b.status === 'ready' ? h('img', { src: `/b/${b.id}/1.jpg`, alt: '', loading: 'lazy' }) : h('div.book-ph', b.status === 'error' ? '⚠' : '⏳'),
+    h('span.book-t', b.title), h('span.book-n', b.status === 'ready' ? b.pages + ' стр.' : b.status === 'error' ? 'ошибка' : 'обрабатывается…'))));
+}
+function openReader(b) {
+  const key = 'book-page-' + b.id;
+  let last = 1; try { last = +localStorage.getItem(key) || 1; } catch {}
+  let zoom = 1;
+  const cnt = h('input.rd-page', { type: 'number', min: 1, max: b.pages, value: last, inputmode: 'numeric', 'aria-label': 'Страница' });
+  const pages = h('div.rd-pages');
+  const imgs = Array.from({ length: b.pages }, (_, i) => h('img.rd-img', { src: `/b/${b.id}/${i + 1}.jpg`, loading: i < 2 || Math.abs(i + 1 - last) < 2 ? 'eager' : 'lazy', alt: 'Страница ' + (i + 1), 'data-n': i + 1 }));
+  imgs.forEach((im, i) => im.addEventListener('load', () => { if (i === 0) pages.style.setProperty('--ar', im.naturalWidth / im.naturalHeight); im.classList.add('ld'); }));
+  pages.append(...imgs);
+  const close = () => { wrap.remove(); document.body.classList.remove('noscroll'); obs.disconnect(); };
+  const go = n => { n = Math.min(b.pages, Math.max(1, n | 0)); imgs[n - 1].scrollIntoView({ block: 'start' }); };
+  const setZoom = z => { const n = +cnt.value || 1; zoom = z; pages.style.setProperty('--z', zoom); zl.textContent = Math.round(zoom * 100) + '%'; requestAnimationFrame(() => go(n)); };
+  const zl = h('span.rd-zl', '100%');
+  cnt.addEventListener('change', () => go(+cnt.value));
+  const wrap = h('div.reader', { role: 'dialog', 'aria-modal': 'true' },
+    h('div.rd-bar',
+      h('button.icon-btn', { onclick: close, 'aria-label': 'Закрыть' }, '✕'),
+      h('b.rd-title', b.title),
+      h('span.rd-pg', cnt, h('span', ' / ' + b.pages)),
+      h('span.rd-zoom', h('button.icon-btn', { onclick: () => setZoom(Math.max(1, zoom - .5)), 'aria-label': 'Мельче' }, '−'), zl,
+        h('button.icon-btn', { onclick: () => setZoom(Math.min(3, zoom + .5)), 'aria-label': 'Крупнее' }, '+'))),
+    pages);
+  document.body.append(wrap); document.body.classList.add('noscroll');
+  const obs = new IntersectionObserver(es => {
+    for (const e of es) if (e.isIntersecting) { const n = +e.target.dataset.n; if (document.activeElement !== cnt) cnt.value = n; try { localStorage.setItem(key, n); } catch {} }
+  }, { root: pages, rootMargin: '-45% 0px -45% 0px' });
+  imgs.forEach(i => obs.observe(i));
+  if (last > 1) setTimeout(() => go(last), 50);
+  const onKey = e => { if (!wrap.isConnected) return document.removeEventListener('keydown', onKey); if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
 }

@@ -15,6 +15,8 @@ const OWNER_EMAILS = (process.env.OWNER_EMAIL || '').toLowerCase().split(',').ma
 const PRICE = Number(process.env.PRICE_RUB) || 399;          // ₽ в год за класс
 const TRIAL_DAYS = Number(process.env.TRIAL_DAYS) || 30;
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const BOOK_DIR = path.join(DATA_DIR, 'books');
+fs.mkdirSync(BOOK_DIR, { recursive: true });
 
 // ---------- База данных ----------
 const db = new DatabaseSync(path.join(DATA_DIR, 'kassa.db'));
@@ -345,6 +347,7 @@ function classState(c, admin) {
     collections,
     payments: admin ? payments : payments.map(p => ({ collection_id: p.collection_id, student_id: p.student_id, amount: p.amount, status: p.status })),
     expenses,
+    books: q("SELECT id, title, pages, status, error FROM books WHERE class_id=? AND (status='ready' OR ?) ORDER BY sort, id").all(cid, admin ? 1 : 0),
     opening,
     totals: { collected, spent, balance: collected - spent },
   };
@@ -745,6 +748,68 @@ route('POST', '/admin/yadisk', async (req, res, b, p, u, c) => {
   }
 }, A);
 
+// --- Учебники: PDF -> страницы-картинки (pdftoppm), читаются прямо на сайте ---
+db.exec(`CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, pages INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'processing', error TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+const { spawn } = require('node:child_process');
+const bookQueue = [];
+let bookBusy = false;
+function convertNext() {
+  if (bookBusy || !bookQueue.length) return;
+  bookBusy = true;
+  const id = bookQueue.shift(), dir = path.join(BOOK_DIR, String(id)), pdf = path.join(dir, 'src.pdf');
+  const done = (err) => {
+    try {
+      if (err) throw err;
+      const files = fs.readdirSync(dir).filter(f => /^p-\d+\.jpg$/.test(f)).sort((a, b) => parseInt(a.slice(2)) - parseInt(b.slice(2)));
+      if (!files.length) throw new Error('Не удалось прочитать PDF');
+      files.forEach((f, i) => fs.renameSync(path.join(dir, f), path.join(dir, (i + 1) + '.jpg')));
+      q("UPDATE books SET status='ready', pages=?, error='' WHERE id=?").run(files.length, id);
+    } catch (e) { q("UPDATE books SET status='error', error=? WHERE id=?").run(String(e.message || e).slice(0, 200), id); }
+    fs.rm(pdf, { force: true }, () => {});
+    bookBusy = false; convertNext();
+  };
+  if (!fs.existsSync(pdf)) return done(new Error('Файл не найден'));
+  const pr = spawn('pdftoppm', ['-jpeg', '-jpegopt', 'quality=55,progressive=y', '-scale-to', '1300', pdf, path.join(dir, 'p')], { stdio: 'ignore' });
+  pr.on('error', () => done(new Error('На сервере нет pdftoppm')));
+  pr.on('close', code => done(code ? new Error('PDF не открылся (код ' + code + ')') : null));
+}
+// при перезапуске доделываем начатое
+for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
+setTimeout(convertNext, 3000);
+route('POST', '/admin/books', async (req, res, b, p, u, c) => {
+  const title = str(new URL(req.url, 'http://x').searchParams.get('title'), 120) || 'Учебник';
+  const id = q("INSERT INTO books(class_id, title, sort) VALUES(?,?, (SELECT COALESCE(MAX(sort),0)+1 FROM books WHERE class_id=?))").run(c.id, title, c.id).lastInsertRowid;
+  const dir = path.join(BOOK_DIR, String(id)); fs.mkdirSync(dir, { recursive: true });
+  const pdf = path.join(dir, 'src.pdf');
+  try {
+    await new Promise((resolve, reject) => {
+      let size = 0, head = null;
+      const out = fs.createWriteStream(pdf);
+      req.on('data', ch => {
+        if (!head) head = ch.subarray(0, 5).toString();
+        size += ch.length;
+        if (size > 400 * 1024 * 1024) { reject(new HttpError(413, 'Файл больше 400 МБ')); req.destroy(); out.destroy(); }
+      });
+      req.pipe(out);
+      out.on('finish', () => head === '%PDF-' ? resolve() : reject(new HttpError(400, 'Это не PDF-файл')));
+      out.on('error', reject); req.on('error', reject);
+    });
+  } catch (e) { q('DELETE FROM books WHERE id=?').run(id); fs.rm(dir, { recursive: true, force: true }, () => {}); throw e; }
+  bookQueue.push(id); convertNext();
+  send(res, 200, { ok: true, id });
+}, { ...W, raw: true });
+route('PUT', '/admin/books/:id', (req, res, b, p, u, c) => {
+  q('UPDATE books SET title=? WHERE id=? AND class_id=?').run(str(b.title, 120) || 'Учебник', int(p.id), c.id);
+  send(res, 200, { ok: true });
+}, W);
+route('DELETE', '/admin/books/:id', (req, res, b, p, u, c) => {
+  const r = q('DELETE FROM books WHERE id=? AND class_id=?').run(int(p.id), c.id);
+  if (r.changes) fs.rm(path.join(BOOK_DIR, String(int(p.id))), { recursive: true, force: true }, () => {});
+  send(res, 200, { ok: true });
+}, A);
+
 // --- Кабинет владельца сервиса ---
 const O = { auth: true, owner: true };
 route('GET', '/api/owner/classes', (req, res) => {
@@ -812,12 +877,14 @@ const server = http.createServer(async (req, res) => {
           if (r.admin && c.user_id !== u.id && !u.is_owner) throw new HttpError(403, 'Это не ваш класс');
           if (r.write && c.paid_until < today() && !u.is_owner) throw new HttpError(402, `Подписка закончилась ${c.paid_until.split('-').reverse().join('.')}. Продлите её, чтобы вносить изменения. Данные сохранены.`);
         }
-        const body = req.method === 'GET' || req.method === 'DELETE' && !+req.headers['content-length'] ? {} : await readBody(req);
+        const body = r.raw || req.method === 'GET' || req.method === 'DELETE' && !+req.headers['content-length'] ? {} : await readBody(req);
         return await r.handler(req, res, body, params, u, c);
       }
       return fail(res, 404, 'Не найдено');
     }
     if (p.startsWith('/uploads/') && (p.includes('/chek-') || p.includes('/qr-'))) return serveFile(res, path.join(UPLOAD_DIR, path.basename(p)), 'public, max-age=31536000, immutable');
+    const bm = /^\/b\/(\d+)\/(\d+)\.jpg$/.exec(p);
+    if (bm) { res.setHeader('X-Robots-Tag', 'noindex, nofollow'); return serveFile(res, path.join(BOOK_DIR, bm[1], bm[2] + '.jpg'), 'public, max-age=31536000, immutable'); }
     if (PAGES[p]) return serveFile(res, path.join(PUBLIC_DIR, PAGES[p]));
     if (p === '/manifest.webmanifest') return sendManifest(res, { name: 'Касса класса', short: 'Касса класса', start: '/account' });
     const mm = /^\/c\/([a-z0-9-]+)\/manifest\.webmanifest$/.exec(p);

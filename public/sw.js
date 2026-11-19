@@ -1,5 +1,5 @@
 // Сервис-воркер: приложение ставится на телефон и открывается даже при плохой связи.
-const CACHE = 'kassa-v3';
+const CACHE = 'kassa-v4';
 const STATIC = ['/app.css', '/common.js', '/index.js', '/admin.js', '/account.js', '/icon.svg', '/icon-192.png', '/offline.html'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
@@ -8,7 +8,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request; const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
-  if (url.pathname.startsWith('/api/')) return; // данные всегда свежие
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/b/')) return; // данные всегда свежие, страницы учебников кэширует сам браузер
   // Сначала сеть, при отсутствии связи - сохранённая копия
   e.respondWith(fetch(req).then(res => {
     if (res.ok && (STATIC.includes(url.pathname) || url.pathname.startsWith('/uploads/') || req.mode === 'navigate')) {

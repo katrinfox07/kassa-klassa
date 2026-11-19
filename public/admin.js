@@ -39,6 +39,7 @@ async function load() {
     { id: 'расходы', label: 'Расходы' },
     { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
+    { id: 'учебники', label: 'Учебники' },
     { id: 'настройки', label: 'Настройки' },
   ], show);
 }
@@ -567,3 +568,42 @@ function backupCard() {
   return h('section.card.form', h('h3', 'Резервная копия'), box,
     h('p.small.muted', 'Или ', h('a', { href: apiUrl('/api/admin/export') }, 'скачать копию файлом'), ' прямо сейчас.'));
 }
+
+
+// ---------- Учебники ----------
+let bookPoll = null;
+VIEWS['учебники'] = () => {
+  clearTimeout(bookPoll);
+  if (S.books.some(b => b.status === 'processing')) bookPoll = setTimeout(() => { if ($('.books-admin')) load(); }, 6000);
+  const title = h('input', { placeholder: 'Например: Русский язык, 1 часть', maxlength: 120 });
+  const file = h('input', { type: 'file', accept: 'application/pdf,.pdf' });
+  file.addEventListener('change', () => { if (file.files[0] && !title.value) title.value = file.files[0].name.replace(/\.pdf$/i, '').replace(/[._]+/g, ' ').trim(); });
+  const bar = h('div.up-bar', { hidden: true }, h('div')), note = h('p.small.muted');
+  const btn = h('button.btn.primary', { type: 'submit' }, 'Загрузить');
+  const form = h('form.form', { onsubmit: e => {
+    e.preventDefault();
+    const f = file.files[0]; if (!f) return toast('Выберите PDF-файл', true);
+    const x = new XMLHttpRequest();
+    x.open('POST', apiUrl('/api/admin/books') + '?title=' + encodeURIComponent(title.value || f.name));
+    x.setRequestHeader('Content-Type', 'application/pdf');
+    bar.hidden = false; btn.disabled = true;
+    x.upload.onprogress = ev => { if (ev.lengthComputable) { const pc = Math.round(ev.loaded / ev.total * 100); bar.firstChild.style.width = pc + '%'; note.textContent = `Загружается… ${pc}% (${Math.round(ev.loaded / 1048576)} из ${Math.round(ev.total / 1048576)} МБ)`; } };
+    x.onload = () => { btn.disabled = false; let r = {}; try { r = JSON.parse(x.responseText); } catch {}
+      if (x.status >= 400) { toast(r.error || 'Не удалось загрузить', true); note.textContent = ''; bar.hidden = true; return; }
+      toast('Загружено, сжимаем страницы…'); load(); };
+    x.onerror = () => { btn.disabled = false; toast('Связь прервалась, попробуйте ещё раз', true); };
+    x.send(f);
+  } },
+    h('label.field', 'PDF-файл учебника', file), h('label.field', 'Название', title), bar, note, btn,
+    h('p.hint', 'После загрузки сайт сам сожмёт учебник в лёгкие картинки-страницы (несколько минут), и он появится у родителей во вкладке «Учебники».'));
+  const rows = S.books.map(b => h('div.book-row',
+    b.status === 'ready' ? h('img', { src: `/b/${b.id}/1.jpg`, alt: '' }) : h('div.book-ph.small', b.status === 'error' ? '⚠' : '⏳'),
+    h('div.grow', h('b', b.title), h('div.small.muted', b.status === 'ready' ? b.pages + ' стр.' : b.status === 'error' ? 'Ошибка: ' + b.error : 'Сжимаем страницы… это займёт несколько минут')),
+    b.status === 'ready' ? h('button.btn.small', { onclick: () => openReader(b) }, 'Открыть') : null,
+    h('button.btn.small', { onclick: () => { const close = modal('Название', h('form.form', { onsubmit: async e => { e.preventDefault(); await act(() => api('PUT', '/api/admin/books/' + b.id, { title: e.target.t.value }), 'Сохранено')(); close(); } },
+      h('input', { name: 't', value: b.title, maxlength: 120 }), h('button.btn.primary', { type: 'submit' }, 'Сохранить'))); } }, '✎'),
+    h('button.btn.small.danger', { onclick: () => confirmInline(() => {}, `Удалить учебник «${b.title}»?`, async () => { await api('DELETE', '/api/admin/books/' + b.id); toast('Удалено'); load(); }) }, '✕')));
+  return h('div.stack.books-admin',
+    h('section.card', h('h3', '📚 Учебники'), rows.length ? h('div.stack', rows) : h('p.muted', 'Пока пусто. Загрузите первый учебник ниже.')),
+    h('section.card', h('h3', 'Добавить учебник'), form));
+};

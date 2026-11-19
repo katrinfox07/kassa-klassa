@@ -18,6 +18,7 @@ async function load() {
     { id: 'инфо', label: 'Информация' },
     { id: 'класс', label: 'Список класса' },
     { id: 'расходы', label: 'Расходы и чеки' },
+    ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
   ], show);
 }
 
@@ -27,6 +28,7 @@ function show(id) {
   if (id === 'расходы') m.replaceChildren(expensesView());
   if (id === 'класс') m.replaceChildren(rosterView());
   if (id === 'инфо') m.replaceChildren(renderInfo(S.info));
+  if (id === 'учебники') m.replaceChildren(h('section.card', h('h3', '📚 Учебники'), h('p.small.muted', 'Нажмите на учебник, чтобы читать. Листайте вниз, кнопки «+» и «−» увеличивают страницу.'), booksGrid(S.books)));
 }
 
 function collectionsView() {
