@@ -160,9 +160,10 @@ function scheduleCard(info) {
   let cur = Math.max(0, days.findIndex(d => isDay(d, dayNames[new Date().getDay()])));
   const short = d => ({ 'понедельник': 'Пн', 'вторник': 'Вт', 'среда': 'Ср', 'четверг': 'Чт', 'пятница': 'Пт', 'суббота': 'Сб', 'воскресенье': 'Вс' })[d.trim().toLowerCase()] || d.slice(0, 2);
   const left = m => m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`;
-  const chips = h('div.daychips'), sum = h('div.sched-sum'), list = h('div.lessons');
+  const chips = h('div.daychips'), todayEl = h('div.sched-today'), sum = h('div.sched-sum'), list = h('div.lessons');
   const draw = anim => {
     const now = new Date(), mins = now.getHours() * 60 + now.getMinutes(), todayName = dayNames[now.getDay()];
+    todayEl.replaceChildren('Сегодня, ', h('b', now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })));
     chips.replaceChildren(...days.map((d, i) => h('button.daychip' + (i === cur ? '.on' : '') + (isDay(d, todayName) ? '.today' : ''),
       { type: 'button', onclick: () => { if (cur !== i) { cur = i; draw(true); } } }, short(d.day))));
     const isToday = days[cur] && isDay(days[cur], todayName);
@@ -209,7 +210,7 @@ function scheduleCard(info) {
   };
   draw(true);
   setInterval(() => { if (list.isConnected) draw(false); }, 30e3);
-  return h('section.card.sched', h('h3', '📅 Расписание из электронного журнала'), h('p.sched-warn', 'Необходимо сверять с ежедневным расписанием из канала школы'), days.length ? chips : null, sum, list);
+  return h('section.card.sched', h('h3', '📅 Расписание из электронного журнала'), h('p.sched-warn', 'Необходимо сверять с ежедневным расписанием из канала школы'), todayEl, days.length ? chips : null, sum, list);
 }
 function linkify(s) {
   if (/^\+?[\d\s()-]{7,}$/.test(s)) return h('a', { href: 'tel:' + s.replace(/[^\d+]/g, '') }, s);
