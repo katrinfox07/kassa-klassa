@@ -57,14 +57,14 @@ function collectionCard(c) {
         h('span.name', s.name),
         h('span.paid-sum', st.s === 'paid' ? rub(st.amount) : st.s === 'partial' ? rub(st.amount) : st.s === 'pending' ? 'проверка' : '0 ₽'),
         st.s === 'partial' ? h('span.debt', 'долг ' + rub(st.debt)) : null))),
-      h('p.hint', { style: 'margin-top:8px' }, 'Рядом с именем – сколько оплачено. Зелёный – оплачено, оранжевым – сколько осталось доплатить, красный – не оплачено, жёлтый – ждёт подтверждения.')));
+      h('p.hint', { style: 'margin-top:8px' }, 'Рядом с именем - сколько оплачено. Зелёный - оплачено, оранжевым - сколько осталось доплатить, красный - не оплачено, жёлтый - ждёт подтверждения.')));
 }
 
 function payDialog(c) {
   const sel = h('select', { required: true }, h('option', { value: '' }, 'Выберите ребёнка'),
     S.students.map(s => {
       const x = statusOf(S, c, s.id), st = x.s;
-      return h('option', { value: s.id, disabled: st === 'paid', 'data-debt': x.debt || '' }, s.name + (st === 'paid' ? ' – оплачено' : st === 'partial' ? ' – доплатить ' + rub(x.debt) : st === 'pending' ? ' – ждёт подтверждения' : ''));
+      return h('option', { value: s.id, disabled: st === 'paid', 'data-debt': x.debt || '' }, s.name + (st === 'paid' ? ' - оплачено' : st === 'partial' ? ' - доплатить ' + rub(x.debt) : st === 'pending' ? ' - ждёт подтверждения' : ''));
     }));
   const amount = h('input', { type: 'number', inputmode: 'numeric', min: 1, value: c.amount || '', required: true });
   sel.addEventListener('change', () => { const d = sel.selectedOptions[0]?.dataset.debt; amount.value = d || c.amount || ''; });
@@ -133,7 +133,7 @@ function rosterView() {
       try { ROSTER = (await api('POST', '/api/roster', { code })).students; try { localStorage.setItem('roster-' + SLUG, code); } catch { } draw(); }
       catch (e) { if (inp.isConnected) toast(e.message, true); try { localStorage.removeItem('roster-' + SLUG); } catch { } }
     };
-    box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Здесь ФИО детей, даты рождения и телефоны родителей. Введите код класса – его знает казначей и присылает в чат класса.'),
+    box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Здесь ФИО детей, даты рождения и телефоны родителей. Введите код класса - его знает казначей и присылает в чат класса.'),
       h('form.row', { onsubmit: e => { e.preventDefault(); go(inp.value.trim()); } }, inp, h('button.btn.primary', { type: 'submit' }, 'Открыть')));
     let saved = null; try { saved = localStorage.getItem('roster-' + SLUG); } catch { }
     if (saved) go(saved);

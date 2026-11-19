@@ -46,8 +46,8 @@ async function load() {
 const VIEWS = {};
 function show(id) { $('#main').replaceChildren(VIEWS[id]()); }
 const act = (fn, okMsg) => async (...a) => { try { await fn(...a); if (okMsg) toast(okMsg); await load(); } catch (e) { toast(e.message, true); } };
-const sName = id => S.students.find(s => s.id === id)?.name || '–';
-const cTitle = id => S.collections.find(c => c.id === id)?.title || '–';
+const sName = id => S.students.find(s => s.id === id)?.name || '-';
+const cTitle = id => S.collections.find(c => c.id === id)?.title || '-';
 
 function shotBtn(p) {
   return p.has_shot ? h('button.btn.small', { onclick: () => viewImage(apiUrl('/api/admin/shot/' + p.id)) }, 'Скриншот') : null;
@@ -154,12 +154,12 @@ function collectionDialog(c) {
   const isNew = !c; c = c || { title: '', description: '', amount: '', due_date: '', pay_link: '', closed: 0, separate: 1 };
   const f = {
     title: h('input', { value: c.title, required: true, maxlength: 150, placeholder: 'Например: Подарки к Новому году' }),
-    amount: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: c.amount, placeholder: '0 – если сумма свободная' }),
+    amount: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: c.amount, placeholder: '0 - если сумма свободная' }),
     due_date: h('input', { type: 'date', value: c.due_date || '' }),
     description: h('textarea', { placeholder: 'На что собираем, подробности' }, c.description),
     closed: h('input', { type: 'checkbox', checked: !!c.closed }),
     flex: h('input', { type: 'checkbox', checked: !!c.flex }),
-    separate: h('select', h('option', { value: '1', selected: !!c.separate }, 'Досбор – на конкретное дело (кино, фото, подарок)'), h('option', { value: '', selected: !c.separate }, 'Взнос в кассу класса')),
+    separate: h('select', h('option', { value: '1', selected: !!c.separate }, 'Досбор - на конкретное дело (кино, фото, подарок)'), h('option', { value: '', selected: !c.separate }, 'Взнос в кассу класса')),
   };
   const links = h('div');
   const addLink = v => {
@@ -196,7 +196,7 @@ function collectionDialog(c) {
       h('span.hint', 'Создайте сбор в приложении банка и вставьте ссылку. Можно в нескольких банках: у родителей появится выбор со значками банков.')),
     h('div.field', h('span', 'QR-код для оплаты (необязательно)'), qrBox,
       h('span.hint', 'Скриншот QR-кода сбора из приложения банка. Его можно оплатить из приложения любого банка.')),
-    h('label.check', f.flex, 'Сумма на выбор (например, 1, 2 или 3 фото) – без общей цели и полосы'),
+    h('label.check', f.flex, 'Сумма на выбор (например, 1, 2 или 3 фото) - без общей цели и полосы'),
     h('label.field', 'Описание', f.description),
     !isNew ? h('label.check', f.closed, 'Сбор закрыт (кнопка оплаты у родителей скроется)') : null,
     h('div.row.between',
@@ -220,7 +220,7 @@ function remind(c) {
   const debts = S.students.filter(s => s.active).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
   const url = classUrl();
   const ownPrices = /₽|руб/i.test(c.description || '');
-  const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount && !ownPrices ? ` – ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
+  const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount && !ownPrices ? ` - ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +
     (c.description ? c.description.trim() + '\n' : '') +
     payLinks(c).map(b => `Оплатить (${b.name}${b.note ? ', ' + b.note : ''}): ${b.url}\n`).join('') + `После оплаты отметьтесь, пожалуйста, на странице класса: ${url}\n` +
     (notPaid.length && notPaid.length < S.students.length ? `\nПока не сдали: ${notPaid.join(', ')}.` : '') +
@@ -274,7 +274,7 @@ function expenseDialog() {
 
 // ---------- Список класса ----------
 VIEWS['класс'] = () => {
-  const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя – по одному на строку (можно вставить из таблицы)' });
+  const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя - по одному на строку (можно вставить из таблицы)' });
   const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
   return h('div.stack',
     h('section.card', h('p.hint', 'Родители видят этот список во вкладке «Список класса»' + (S.class.listCode ? ` после ввода кода ${S.class.listCode}` : '') + '. Чтобы поправить данные, нажмите на ребёнка.'),
@@ -304,26 +304,26 @@ function editKid(s, save) {
     h('button.linklike', { type: 'button', onclick: async () => { await act(() => save(s, { active: !s.active }))(); close(); } }, s.active ? 'Отметить, что ребёнок выбыл из класса' : 'Вернуть в класс')));
 }
 
-// Расписание: одна таблица – уроки по строкам, дни по столбцам, время звонков в первой колонке
+// Расписание: одна таблица - уроки по строкам, дни по столбцам, время звонков в первой колонке
 function scheduleEditor(info) {
   const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
   const SH = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
   const grid = DAYS.map(d => {
     const t = (info.timetable || []).find(x => (x.day || '').trim().toLowerCase() === d.toLowerCase());
-    return t ? t.lessons.split('\n').map(x => x.trim()).map(x => /^[–-]+$/.test(x) ? '' : x) : [];
+    return t ? t.lessons.split('\n').map(x => x.trim()).map(x => /^[-\u2013\u2014]+$/.test(x) ? '' : x) : [];
   });
-  const times = (info.bells || []).map(b => b.from && b.to ? `${b.from}–${b.to}` : '');
+  const times = (info.bells || []).map(b => b.from && b.to ? `${b.from}-${b.to}` : '');
   const afters = (info.bells || []).map(b => b.after || '');
   let rows = Math.max(6, times.length, ...grid.map(g => g.length));
   const sync = () => {
     info.bells = Array.from({ length: rows }, (_, i) => { const m = /(\d{1,2}[:.]\d{2})\D+(\d{1,2}[:.]\d{2})/.exec(times[i] || ''); const f = x => x.replace('.', ':').padStart(5, '0'); return m ? { from: f(m[1]), to: f(m[2]), after: afters[i] || '' } : { from: '', to: '' }; });
     while (info.bells.length && !info.bells[info.bells.length - 1].from) info.bells.pop();
-    info.timetable = DAYS.map((d, j) => { const l = Array.from({ length: rows }, (_, i) => grid[j][i] || ''); while (l.length && !l[l.length - 1]) l.pop(); return { day: d, lessons: l.map(x => x || '–').join('\n') }; }).filter(d => d.lessons);
+    info.timetable = DAYS.map((d, j) => { const l = Array.from({ length: rows }, (_, i) => grid[j][i] || ''); while (l.length && !l[l.length - 1]) l.pop(); return { day: d, lessons: l.map(x => x || '-').join('\n') }; }).filter(d => d.lessons);
   };
   const body = h('tbody');
   const draw = () => body.replaceChildren(...Array.from({ length: rows }, (_, i) => h('tr',
     h('td.sn', i + 1),
-    h('td', h('input.cell.time', { value: times[i] || '', placeholder: '08:00–08:40', oninput: e => { times[i] = e.target.value; sync(); } })),
+    h('td', h('input.cell.time', { value: times[i] || '', placeholder: '08:00-08:40', oninput: e => { times[i] = e.target.value; sync(); } })),
     ...DAYS.map((_, j) => h('td', h('input.cell', { value: grid[j][i] || '', oninput: e => { grid[j][i] = e.target.value; sync(); } }))))));
   draw(); sync();
   return h('section.card', h('h3', '📅 Расписание уроков и звонков'),
@@ -331,7 +331,7 @@ function scheduleEditor(info) {
     h('div.row', { style: 'margin-top:6px' },
       h('button.btn.small', { type: 'button', onclick: () => { rows++; draw(); } }, '+ урок'),
       h('button.btn.small', { type: 'button', onclick: () => { if (rows > 1) { rows--; grid.forEach(g => g.length = Math.min(g.length, rows)); times.length = Math.min(times.length, rows); sync(); draw(); } } }, '− урок'),
-      h('span.hint', 'Пустая клетка – нет урока.')));
+      h('span.hint', 'Пустая клетка - нет урока.')));
 }
 
 // ---------- Информация ----------
@@ -372,7 +372,7 @@ VIEWS['настройки'] = () => {
     title: h('input', { value: S.class.title, maxlength: 100, placeholder: 'Например: 5 «Б» класс' }),
     treasurer: h('input', { value: S.class.treasurer, maxlength: 100, placeholder: 'Как к вам обращаться' }),
     listCode: h('input', { value: S.class.listCode || '', maxlength: 20, placeholder: 'Например: 5g2026' }),
-    payHint: h('textarea', { placeholder: 'Например: если не получается по ссылке – напишите мне в чат' }, S.class.payHint),
+    payHint: h('textarea', { placeholder: 'Например: если не получается по ссылке - напишите мне в чат' }, S.class.payHint),
     opening: h('input', { type: 'number', inputmode: 'numeric', min: 0, value: S.opening?.amount || 0 }),
     openingNote: h('input', { value: S.opening?.note || '', maxlength: 200, placeholder: 'Например: остаток прошлых сборов' }),
   };
@@ -380,7 +380,7 @@ VIEWS['настройки'] = () => {
     h('section.card.form', h('h3', 'Класс'),
       h('label.field', 'Название (заголовок страницы)', f.title),
       h('label.field', 'Казначей', f.treasurer),
-      h('label.field', 'Код для списка класса (необязательно; пусто – список открыт всем родителям)', f.listCode),
+      h('label.field', 'Код для списка класса (необязательно; пусто - список открыт всем родителям)', f.listCode),
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
       h('button.btn.primary', { onclick: act(() => api('PUT', '/api/admin/class', Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]))), 'Сохранено') }, 'Сохранить')),
@@ -420,7 +420,7 @@ function pushCard() {
         h('button.linklike', { onclick: async () => { await api('POST', '/api/admin/push/off', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); render(); } }, 'выключить')));
       return;
     }
-    box.replaceChildren(h('div.row.between', h('div.grow', h('b', '🔔 Сразу узнавать об оплатах'), h('div.small.muted', 'На телефон: «Иванов Петя – 5 000 ₽, 01:32»')),
+    box.replaceChildren(h('div.row.between', h('div.grow', h('b', '🔔 Сразу узнавать об оплатах'), h('div.small.muted', 'На телефон: «Иванов Петя - 5 000 ₽, 01:32»')),
       h('button.btn.primary.small', { onclick: async e => {
         e.target.disabled = true;
         try {
@@ -486,11 +486,11 @@ function reconcileDialog() {
     if (!recs.length) { res.replaceChildren(h('p.small.muted', 'Не нашла сумм. Скопируйте строки, где есть имя и сумма в ₽.')); return; }
     const rows = recs.map(r => {
       const kid = matchKid(r, kids);
-      const pick = h('select.small', h('option', { value: '' }, '– не учитывать –'), kids.map(s => h('option', { value: s.id, selected: kid?.id === s.id }, s.name)));
+      const pick = h('select.small', h('option', { value: '' }, '- не учитывать -'), kids.map(s => h('option', { value: s.id, selected: kid?.id === s.id }, s.name)));
       const info = h('span.small');
       const upd = () => {
         const s = kids.find(k => k.id === Number(pick.value));
-        if (!s) { info.textContent = kid ? '' : 'не узнала – выберите ребёнка'; info.className = 'small muted'; return; }
+        if (!s) { info.textContent = kid ? '' : 'не узнала - выберите ребёнка'; info.className = 'small muted'; return; }
         const st = statusOf(S, c, s.id);
         info.className = 'small ' + (st.s === 'paid' ? 'muted' : 'ok-text');
         info.textContent = st.s === 'paid' ? 'уже отмечено' : st.s === 'pending' ? 'есть отметка родителя → подтвердить' : st.s === 'partial' ? 'доплата' : 'отметить оплату';
@@ -539,11 +539,11 @@ function backupCard() {
     }
     const token = h('input', { placeholder: 'вставьте токен', autocomplete: 'off' });
     box.replaceChildren(
-      h('p.small', 'Подключите Яндекс.Диск – и каждую ночь туда будет сохраняться копия: сборы, оплаты, расходы, чеки и скриншоты.'),
+      h('p.small', 'Подключите Яндекс.Диск - и каждую ночь туда будет сохраняться копия: сборы, оплаты, расходы, чеки и скриншоты.'),
       y.error ? h('p.small', { style: 'color:var(--bad)' }, '⚠ ' + y.error) : null,
       h('ol.small.muted', { style: 'margin:4px 0 8px;padding-left:18px' },
         h('li', 'Откройте ', h('a', { href: 'https://oauth.yandex.ru/authorize?response_type=token&client_id=f53cfda9e2ad4769863f72f63b959a3f', target: '_blank', rel: 'noopener' }, 'страницу Яндекса'), ' и войдите в свой аккаунт.'),
-        h('li', 'Нажмите «Разрешить» – Яндекс покажет токен (длинная строка).'),
+        h('li', 'Нажмите «Разрешить» - Яндекс покажет токен (длинная строка).'),
         h('li', 'Скопируйте его и вставьте сюда.')),
       h('label.field', 'Токен Яндекс.Диска', token),
       h('button.btn.primary', { onclick: act(async () => render(await api('POST', '/api/admin/yadisk', { token: token.value })), 'Подключено, первая копия на Диске') }, 'Подключить'));

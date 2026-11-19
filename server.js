@@ -1,5 +1,5 @@
 'use strict';
-// «Касса класса» – сервис для казначеев: много классов на одном сайте.
+// «Касса класса» - сервис для казначеев: много классов на одном сайте.
 // Node 22.13+, встроенный SQLite, без внешних зависимостей.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -88,16 +88,21 @@ if (!getSettingRaw('mig_photo_flex')) {
   db.exec("UPDATE collections SET flex=1 WHERE title='Фотографии' AND description LIKE '1 фото%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_flex', '1')").run();
 }
+if (!getSettingRaw('mig_hyphen')) {
+  for (const [t, cols] of [['collections', ['title', 'description']], ['expenses', ['title', 'note']], ['payments', ['note']], ['class_settings', ['value']], ['classes', ['title']]])
+    for (const col of cols) for (const ch of [8211, 8212]) db.exec(`UPDATE ${t} SET ${col}=replace(${col}, char(${ch}), '-') WHERE instr(${col}, char(${ch})) > 0`);
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_hyphen', '1')").run();
+}
 if (!getSettingRaw('mig_short_dash')) {
   for (const [t, cols] of [['collections', ['title', 'description']], ['expenses', ['title', 'note']], ['payments', ['note']], ['class_settings', ['value']], ['classes', ['title']]])
     for (const col of cols) db.exec(`UPDATE ${t} SET ${col}=replace(${col}, char(8212), char(8211)) WHERE instr(${col}, char(8212)) > 0`);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_short_dash', '1')").run();
 }
 if (!getSettingRaw('mig_photo_separate')) {
-  db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото – 450%'");
+  db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото - 450%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_separate', '1')").run();
 }
-// исправление переноса 5Г: у троих «Внесено» было пусто; 1 400 ₽ – остаток прошлых сборов
+// исправление переноса 5Г: у троих «Внесено» было пусто; 1 400 ₽ - остаток прошлых сборов
 if (!getSettingRaw('mig_5g_fix')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   if (cl) {
@@ -124,7 +129,7 @@ if (!getSettingRaw('mig_5g_ozon')) {
   if (k && !k.pay_link.includes(OZON)) q('UPDATE collections SET pay_link=? WHERE id=?').run([...k.pay_link.split(/\s+/).filter(Boolean), OZON].join('\n'), k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon', '1')").run();
 }
-// 5Г: оставить только ссылку Озон Банка (перевод по СБП из любого банка) – просьба казначея
+// 5Г: оставить только ссылку Озон Банка (перевод по СБП из любого банка) - просьба казначея
 if (!getSettingRaw('mig_5g_ozon_only')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const k = cl && q("SELECT id FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
@@ -142,7 +147,7 @@ if (!getSettingRaw('mig_5g_noemail')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_noemail', '1')").run();
 }
-// 5Г: день рождения классного руководителя – 12 ноября (со слов казначея)
+// 5Г: день рождения классного руководителя - 12 ноября (со слов казначея)
 if (!getSettingRaw('mig_5g_klbday')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -168,7 +173,7 @@ if (!getSettingRaw('mig_5g_open_list')) {
   if (row) { const v = JSON.parse(row.value || '{}'); v.listCode = ''; q("UPDATE class_settings SET value=? WHERE class_id=? AND key='class'").run(JSON.stringify(v), cl.id); }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_open_list', '1')").run();
 }
-// 5Г: после 4 урока – столовая, перекус (со слов казначея)
+// 5Г: после 4 урока - столовая, перекус (со слов казначея)
 if (!getSettingRaw('mig_5g_lunch')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -344,7 +349,7 @@ function classState(c, admin) {
 
 // ---------- Маршруты ----------
 const routes = [];
-// opts: auth – нужен вход; cls – маршрут класса (/api/c/:slug/...), admin – только хозяин класса; owner – только владелец сервиса
+// opts: auth - нужен вход; cls - маршрут класса (/api/c/:slug/...), admin - только хозяин класса; owner - только владелец сервиса
 const route = (method, pattern, handler, opts = {}) => routes.push({
   method, handler, ...opts,
   re: new RegExp('^' + (opts.cls ? '/api/c/(?<slug>[a-z0-9-]+)' : '') + pattern.replace(/:(\w+)/g, '(?<$1>\\d+)') + '$'),
@@ -410,7 +415,7 @@ route('POST', '/api/classes', (req, res, b, p, u) => {
 
 // --- Публичная страница класса ---
 route('GET', '/public', (req, res, b, p, u, c) => send(res, 200, classState(c, false)), { cls: true });
-// Полный список класса для родителей – только по коду класса
+// Полный список класса для родителей - только по коду класса
 route('POST', '/roster', (req, res, b, p, u, c) => {
   rate(req, 'roster', 20, 600e3);
   const code = getSetting(c.id, 'class', {}).listCode || '';
@@ -433,7 +438,7 @@ route('POST', '/report-payment', async (req, res, b, p, u, c) => {
   q('INSERT INTO payments(class_id, collection_id, student_id, amount, payer, note, screenshot) VALUES(?,?,?,?,?,?,?)')
     .run(c.id, k.id, s.id, amount, str(b.payer, 120), str(b.note, 300), shot);
   send(res, 200, { ok: true });
-  pushClass(c.id, { title: `💰 ${s.name} – ${amount.toLocaleString('ru-RU')} ₽`, body: k.title + (str(b.payer, 120) ? ' · платил(а): ' + str(b.payer, 120) : '') + (shot ? ' · есть скриншот' : ''),
+  pushClass(c.id, { title: `💰 ${s.name} - ${amount.toLocaleString('ru-RU')} ₽`, body: k.title + (str(b.payer, 120) ? ' · платил(а): ' + str(b.payer, 120) : '') + (shot ? ' · есть скриншот' : ''),
     ts: Date.now(), url: '/c/' + c.slug + '/admin#проверить' }).catch(() => {});
 }, { cls: true });
 
@@ -640,9 +645,9 @@ const YD = process.env.YADISK_URL || 'https://webdav.yandex.ru';
 const YAPI = process.env.YADISK_API || 'https://cloud-api.yandex.net/v1/disk';
 const localDay = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); // по Новосибирску
 const ydFail = (what, st) => {
-  if (st === 401 || st === 403) return new Error('Яндекс не принял токен или пароль – получите новый');
+  if (st === 401 || st === 403) return new Error('Яндекс не принял токен или пароль - получите новый');
   if (st === 507) return new Error('На Яндекс.Диске закончилось место');
-  if (st === 423) return new Error('Яндекс заблокировал запись (423). Подключите Диск по токену – инструкция в кабинете');
+  if (st === 423) return new Error('Яндекс заблокировал запись (423). Подключите Диск по токену - инструкция в кабинете');
   if (st === 429) return new Error('Яндекс просит подождать (429), попробуйте через пару минут');
   return new Error(what + ' (' + st + ')');
 };
@@ -683,7 +688,7 @@ async function backupClass(c) {
   for (const d of [root, dir, fdir]) await yd.mkdir(d);
   const day = localDay();
   await yd.put(`${dir}/kassa-${c.slug}-${day}.json`, JSON.stringify(classState(c, true), null, 1));
-  // чеки, скриншоты оплат и QR – докачиваем только новые
+  // чеки, скриншоты оплат и QR - докачиваем только новые
   const files = new Set([
     ...q('SELECT screenshot f FROM payments WHERE class_id=? AND screenshot IS NOT NULL').all(c.id).map(r => r.f),
     ...q('SELECT r.file f FROM receipts r JOIN expenses e ON e.id=r.expense_id WHERE e.class_id=?').all(c.id).map(r => r.f),

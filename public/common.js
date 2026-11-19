@@ -134,7 +134,7 @@ function renderInfo(info) {
       h('div.hols', info.holidays.map(x => {
         const past = D(x.to || x.from) < t0, cur = x === next;
         return h('div.hol' + (past ? '.past' : '') + (cur ? '.next' : ''), h('b', x.title),
-          h('span', (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' – ' + fdate(x.to) : '')),
+          h('span', (x.from ? fdate(x.from) : '') + (x.to && x.to !== x.from ? ' - ' + fdate(x.to) : '')),
           x.from && x.to ? h('span.muted.small', days(Math.round((D(x.to) - D(x.from)) / 864e5) + 1)) : null);
       }))));
   }
@@ -171,7 +171,7 @@ function scheduleCard(info) {
     while (lessons.length && !lessons[lessons.length - 1]) lessons.pop();
     const n = days.length ? lessons.length : bells.length;
     const todayOn = days.length ? isToday : now.getDay() % 6;
-    const isEmpty = i => days.length && (!lessons[i] || /^[–-]+$/.test(lessons[i]));
+    const isEmpty = i => days.length && (!lessons[i] || /^[-\u2013\u2014]+$/.test(lessons[i]));
     let first = 0; while (first < n && isEmpty(first)) first++;
     const real = [...Array(n).keys()].filter(i => !isEmpty(i));
     const rows = [];
@@ -201,7 +201,7 @@ function scheduleCard(info) {
       const endM = toM(lb.to);
       sum.replaceChildren(...[
         h('span', `${real.length} ${real.length === 1 ? 'урок' : real.length < 5 ? 'урока' : 'уроков'}`),
-        fb.from ? h('span', `${fb.from}–${lb.to || ''}`) : null,
+        fb.from ? h('span', `${fb.from}-${lb.to || ''}`) : null,
         first > 0 ? h('span.sched-late', `с ${first + 1}-го урока`) : null,
         isToday && endM && mins >= endM ? h('span.sched-done', 'уроки закончились') : null].filter(Boolean));
     } else sum.replaceChildren(days.length ? h('span', 'уроков нет') : '');
@@ -271,7 +271,7 @@ function expRow(e, coll, extra) {
   return h('div.exprow',
     r.length ? h('button.expthumb', { onclick: () => r.length > 1 ? modal('Чеки: ' + e.title, h('div.stack', r.map(src => h('img.full-img', { src, alt: 'Чек' })))) : viewImage(r[0]), 'aria-label': 'Открыть чек' },
       h('img', { src: r[0], alt: 'Чек', loading: 'lazy' }), r.length > 1 ? h('span.expcount', r.length) : null)
-      : h('div.expthumb.none', { title: 'Чек не приложен' }, '–'),
+      : h('div.expthumb.none', { title: 'Чек не приложен' }, '-'),
     h('div.expmain', h('div.exptitle', e.title), h('div.expmeta', fdate(e.date) + (coll ? ' · ' + coll : '') + (e.note ? ' · ' + e.note : ''))),
     h('div.expsum', rub(e.amount)), extra || null);
 }

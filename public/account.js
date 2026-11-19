@@ -61,7 +61,7 @@ function classesView() {
       h('div.row', { style: 'margin-top:10px' },
         h('a.btn.primary.small', { href: '/c/' + c.slug + '/admin' }, 'Открыть кабинет'),
         h('button.btn.small', { onclick: async () => { try { await navigator.clipboard.writeText(url); toast('Ссылка для родителей скопирована'); } catch { toast(url); } } }, 'Ссылка для родителей'),
-        h('button.btn.small', { onclick: () => payDialog(c) }, `Продлить – ${rub(ME.price)}/год`))));
+        h('button.btn.small', { onclick: () => payDialog(c) }, `Продлить - ${rub(ME.price)}/год`))));
   });
   wrap.append(createForm());
   $('#main').replaceChildren(wrap);
@@ -78,7 +78,7 @@ function payDialog(c) {
 function createForm() {
   const title = h('input', { required: true, maxlength: 100, placeholder: 'Например: Школа 12, 4 «А»' });
   const slug = h('input', { maxlength: 40, placeholder: 'например: shkola12-4a', pattern: '[a-z0-9-]{3,40}' });
-  const kids = h('textarea', { rows: 6, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя – по одному на строку.\nМожно вставить прямо из таблицы.' });
+  const kids = h('textarea', { rows: 6, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя - по одному на строку.\nМожно вставить прямо из таблицы.' });
   const btn = h('button.btn.primary', { type: 'submit' }, 'Создать класс');
   const translit = s => { const T = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' };
     return s.toLowerCase().split('').map(c => T[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40); };
