@@ -537,3 +537,49 @@ div.field .linklike { justify-self: start; }
 .brk { display: grid; grid-template-columns: 26px 92px 1fr auto; align-items: center; gap: 10px; padding: 1px 10px; font-size: 12px; color: var(--muted); }
 .brk.live { background: var(--ok-soft); color: var(--ok); font-weight: 700; border-radius: 9px; padding: 4px 10px; }
 @media (max-width: 420px) { .brk { grid-template-columns: 24px 78px 1fr auto; gap: 8px; } }
+
+/* Расписание v2: таймлайн */
+.sched .daychips { display: grid; grid-template-columns: repeat(auto-fit, minmax(38px, 1fr)); gap: 5px; margin: 2px 0 8px; }
+.sched .daychip { width: auto; height: 38px; }
+.sched-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.sched-sum span { background: var(--bg); padding: 3px 9px; border-radius: 999px; }
+.sched-sum .sched-late { background: var(--warn-soft); color: var(--warn); }
+.sched-sum .sched-done { background: var(--ok-soft); color: var(--ok); }
+.sched .lessons { gap: 0; }
+.sched .lesson { position: relative; grid-template-columns: 26px 50px 1fr auto; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--bg); overflow: hidden; transition: background .3s, opacity .3s; }
+.sched .lesson .lt { display: flex; flex-direction: column; line-height: 1.15; }
+.sched .lesson .lt b { color: var(--text); font-size: 14px; }
+.sched .lesson .lt small { font-size: 11.5px; color: var(--muted); }
+.sched .lesson .ls { font-size: 15px; }
+.sched .lesson.past { opacity: .55; }
+.sched .lesson.past .ln { background: var(--ok-soft); color: var(--ok); }
+.sched .lesson.empty { background: transparent; border: 1.5px dashed var(--line); padding: 5px 10px; }
+.sched .lesson.live { background: var(--grad); color: #fff; box-shadow: 0 6px 18px rgba(108, 76, 230, .28); }
+.sched .lesson.live .ln { background: rgba(255,255,255,.22); color: #fff; }
+.sched .lesson.live .lt b, .sched .lesson.live .lt small { color: #fff; }
+.sched .lesson.live .lt small { opacity: .8; }
+.lleft { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.lleft .pdot { width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 0 rgba(255,255,255,.7); }
+.lbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.2); }
+.lbar > div { height: 100%; background: #fff; border-radius: 0 3px 3px 0; transition: width .6s; }
+.sched .brk { display: flex; align-items: center; gap: 8px; padding: 3px 0 3px 22px; font-size: 12px; color: var(--muted); min-height: 22px; }
+.brk-line { width: 2px; align-self: stretch; min-height: 16px; border-left: 2px dotted var(--line); margin-right: 14px; }
+.sched .brk.food .brk-t { background: var(--warn-soft); color: var(--warn); padding: 2px 9px; border-radius: 999px; font-weight: 700; }
+.sched .brk.food .brk-t b { font-weight: 700; }
+.sched .brk.live { background: none; padding: 3px 0 3px 22px; }
+.sched .brk.live .brk-line { border-left: 2px solid var(--ok); }
+.sched .brk.live .brk-t { color: var(--ok); font-weight: 800; }
+.brk-now { margin-left: auto; background: var(--ok-soft); color: var(--ok); font-weight: 800; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+@media (max-width: 420px) { .sched .lesson { grid-template-columns: 24px 44px 1fr auto; gap: 8px; } .sched .lesson .ls { font-size: 14px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sched .lessons:not(.anim) > * { animation: none; }
+  .sched .lessons.anim > * { animation: rise .4s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 35ms); }
+  .lleft .pdot { animation: ping 1.6s ease-out infinite; }
+  .sched .lesson.live { background-size: 200% 200%; animation: shimmer 6s ease-in-out infinite; }
+  .sched .lessons.anim > .lesson.live { animation: rise .4s cubic-bezier(.2,.8,.2,1) both, shimmer 6s ease-in-out infinite; animation-delay: calc(var(--i) * 35ms), 0s; }
+  .sched .lesson.live .pill { animation: none; }
+}
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,.75); } 80%, 100% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+@keyframes shimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.sched .brk.live .brk-t { background: var(--ok-soft); color: var(--ok); padding: 2px 9px; border-radius: 999px; }
+.sched .brk.live .brk-now { background: var(--ok); color: #fff; }

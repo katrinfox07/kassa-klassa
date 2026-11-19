@@ -154,42 +154,62 @@ function renderInfo(info) {
 }
 function scheduleCard(info) {
   const bells = info.bells || [], days = (info.timetable || []).filter(d => d.day);
-  const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
   const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
-  const todayName = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][now.getDay()];
+  const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
   const isDay = (d, n) => d.day.trim().toLowerCase() === n;
-  let cur = Math.max(0, days.findIndex(d => isDay(d, todayName)));
+  let cur = Math.max(0, days.findIndex(d => isDay(d, dayNames[new Date().getDay()])));
   const short = d => ({ 'понедельник': 'Пн', 'вторник': 'Вт', 'среда': 'Ср', 'четверг': 'Чт', 'пятница': 'Пт', 'суббота': 'Сб', 'воскресенье': 'Вс' })[d.trim().toLowerCase()] || d.slice(0, 2);
-  const chips = h('div.daychips'), list = h('div.lessons');
-  const draw = () => {
+  const left = m => m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`;
+  const chips = h('div.daychips'), sum = h('div.sched-sum'), list = h('div.lessons');
+  const draw = anim => {
+    const now = new Date(), mins = now.getHours() * 60 + now.getMinutes(), todayName = dayNames[now.getDay()];
     chips.replaceChildren(...days.map((d, i) => h('button.daychip' + (i === cur ? '.on' : '') + (isDay(d, todayName) ? '.today' : ''),
-      { type: 'button', onclick: () => { cur = i; draw(); } }, short(d.day))));
+      { type: 'button', onclick: () => { if (cur !== i) { cur = i; draw(true); } } }, short(d.day))));
     const isToday = days[cur] && isDay(days[cur], todayName);
     const lessons = days.length ? days[cur].lessons.split('\n').map(x => x.trim()) : [];
     while (lessons.length && !lessons[lessons.length - 1]) lessons.pop();
     const n = days.length ? lessons.length : bells.length;
     const todayOn = days.length ? isToday : now.getDay() % 6;
     const isEmpty = i => days.length && (!lessons[i] || /^[–-]+$/.test(lessons[i]));
+    let first = 0; while (first < n && isEmpty(first)) first++; // пустые первые уроки не показываем
+    const real = [...Array(n).keys()].filter(i => !isEmpty(i));
     const rows = [];
-    for (let i = 0; i < n; i++) {
-      const b = bells[i] || {}, subj = days.length ? lessons[i] : '';
-      const empty = isEmpty(i);
-      const live = todayOn && b.from && mins >= toM(b.from) && mins < toM(b.to);
-      rows.push(h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : ''),
-        h('span.ln', i + 1), h('span.lt', b.from ? `${b.from}–${b.to}` : ''),
-        h('span.ls', days.length ? (empty ? 'нет урока' : subj) : ''), live ? h('span.pill.blue', 'идёт') : h('span')));
+    let k = 0; const st = () => ({ style: `--i:${k++}` });
+    for (let i = first; i < n; i++) {
+      const b = bells[i] || {}, subj = days.length ? lessons[i] : '', empty = isEmpty(i);
+      const from = toM(b.from), to = toM(b.to);
+      const live = todayOn && b.from && mins >= from && mins < to, past = todayOn && b.to && mins >= to;
+      const pct = live ? Math.round((mins - from) / (to - from) * 100) : 0;
+      rows.push(h('div.lesson' + (empty ? '.empty' : '') + (live ? '.live' : '') + (past && !empty ? '.past' : ''), st(),
+        h('span.ln', past && !empty ? '✓' : i + 1),
+        h('span.lt', b.from ? h('b', b.from) : '', b.to ? h('small', b.to) : ''),
+        h('span.ls', days.length ? (empty ? 'окно' : subj) : ''),
+        live ? h('span.lleft', h('i.pdot'), 'ещё ' + left(to - mins)) : h('span'),
+        live ? h('div.lbar', h('div', { style: `width:${pct}%` })) : null));
       const nb = bells[i + 1];
       if (i < n - 1 && b.to && nb?.from && !empty && !isEmpty(i + 1)) {
         const len = toM(nb.from) - toM(b.to);
         const bl = todayOn && mins >= toM(b.to) && mins < toM(nb.from);
-        if (len > 0) rows.push(h('div.brk' + (bl ? '.live' : ''), h('span'), h('span.lt', `${b.to}–${nb.from}`),
-          h('span', `перемена ${len} мин`, b.after ? h('b', ' · 🍽 ' + b.after) : null), bl ? h('span.pill.ok', 'сейчас') : h('span')));
+        if (len > 0) rows.push(h('div.brk' + (bl ? '.live' : '') + (b.after ? '.food' : ''), st(), h('span.brk-line'),
+          h('span.brk-t', b.after ? '🍽 ' : '', `перемена ${len} мин`, b.after ? h('b', ' · ' + b.after) : null),
+          bl ? h('span.brk-now', 'ещё ' + left(toM(nb.from) - mins)) : null));
       }
     }
+    if (days.length && real.length) {
+      const fb = bells[real[0]] || {}, lb = bells[real[real.length - 1]] || {};
+      const endM = toM(lb.to);
+      sum.replaceChildren(...[
+        h('span', `${real.length} ${real.length === 1 ? 'урок' : real.length < 5 ? 'урока' : 'уроков'}`),
+        fb.from ? h('span', `${fb.from}–${lb.to || ''}`) : null,
+        first > 0 ? h('span.sched-late', `с ${first + 1}-го урока`) : null,
+        isToday && endM && mins >= endM ? h('span.sched-done', 'уроки закончились') : null].filter(Boolean));
+    } else sum.replaceChildren(days.length ? h('span', 'уроков нет') : '');
     list.replaceChildren(...rows);
+    list.classList.toggle('anim', !!anim);
   };
-  draw();
-  return h('section.card', h('h3', '📅 Расписание из электронного журнала'), days.length ? chips : null, list);
+  draw(true);
+  setInterval(() => { if (list.isConnected) draw(false); }, 30e3);
+  return h('section.card.sched', h('h3', '📅 Расписание из электронного журнала'), days.length ? chips : null, sum, list);
 }
 function linkify(s) {
   if (/^\+?[\d\s()-]{7,}$/.test(s)) return h('a', { href: 'tel:' + s.replace(/[^\d+]/g, '') }, s);
