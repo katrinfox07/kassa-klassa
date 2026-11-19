@@ -210,7 +210,7 @@ function scheduleCard(info) {
   };
   draw(true);
   setInterval(() => { if (list.isConnected) draw(false); }, 30e3);
-  return h('section.card.sched', h('h3', '📅 Расписание из электронного журнала'), h('p.sched-warn', 'Необходимо сверять с ежедневным расписанием из канала школы'), todayEl, days.length ? chips : null, sum, list);
+  return h('section.card.sched', h('h3', '📅 Расписание из электронного журнала'), h('p.sched-warn', 'Необходимо сверять с ежедневным расписанием из канала MAX школы'), todayEl, days.length ? chips : null, sum, list);
 }
 function linkify(s) {
   if (/^\+?[\d\s()-]{7,}$/.test(s)) return h('a', { href: 'tel:' + s.replace(/[^\d+]/g, '') }, s);
