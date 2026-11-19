@@ -625,3 +625,4 @@ div.field .linklike { justify-self: start; }
 @keyframes breatheG { 0%, 100% { box-shadow: 0 0 0 0 rgba(31,157,85,0); } 50% { box-shadow: 0 0 0 4px rgba(31,157,85,.18); } }
 .sched-warn { color: var(--bad); font-size: 13px; font-weight: 700; margin: -4px 0 10px; }
 .sched-today { font-size: 14px; color: var(--muted); margin: 0 0 8px; } .sched-today b { color: var(--text); }
+.kid-parent { align-self: center; }
