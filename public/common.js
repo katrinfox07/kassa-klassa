@@ -204,12 +204,6 @@ function scheduleCard(info) {
         first > 0 ? h('span.sched-late', `с ${first + 1}-го урока`) : null,
         isToday && endM && mins >= endM ? h('span.sched-done', 'уроки закончились') : null].filter(Boolean));
     } else sum.replaceChildren(days.length ? h('span', 'уроков нет') : '');
-    const fb0 = real.length && bells[real[0]];
-    if (todayOn && days.length && fb0?.from && mins < toM(fb0.from)) {
-      const wait = toM(fb0.from) - mins;
-      rows.unshift(h('div.sched-wait', { style: '--i:0' }, h('i.pdot'), h('span', 'До начала уроков ', h('b', 'ещё ' + left(wait))),
-        h('span.sched-wait-t', `${first + 1}-й урок в ${fb0.from}`)));
-    }
     list.replaceChildren(...rows);
     list.classList.toggle('anim', !!anim);
   };
