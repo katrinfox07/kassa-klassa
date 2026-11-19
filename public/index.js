@@ -15,9 +15,9 @@ async function load() {
     h('div.total.main', h('div.label', 'В кассе'), h('div.value', rub(S.totals.balance))));
   tabs($('#tabs'), [
     { id: 'сборы', label: 'Сборы' },
-    { id: 'расходы', label: 'Расходы и чеки' },
-    { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
+    { id: 'класс', label: 'Список класса' },
+    { id: 'расходы', label: 'Расходы и чеки' },
   ], show);
 }
 
