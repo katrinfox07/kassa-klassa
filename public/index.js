@@ -16,9 +16,9 @@ async function load() {
   tabs($('#tabs'), [
     { id: 'сборы', label: 'Сборы' },
     { id: 'инфо', label: 'Информация' },
+    ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
     { id: 'класс', label: 'Список класса' },
     { id: 'расходы', label: 'Расходы и чеки' },
-    ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
   ], show);
 }
 
