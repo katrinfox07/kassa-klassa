@@ -800,6 +800,11 @@ route('POST', '/admin/books', async (req, res, b, p, u, c) => {
   bookQueue.push(id); convertNext();
   send(res, 200, { ok: true, id });
 }, { ...W, raw: true });
+route('PUT', '/admin/books-order', (req, res, b, p, u, c) => {
+  const ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Number.isInteger).slice(0, 500);
+  ids.forEach((id, i) => q('UPDATE books SET sort=? WHERE id=? AND class_id=?').run(i + 1, id, c.id));
+  send(res, 200, { ok: true });
+}, W);
 route('PUT', '/admin/books/:id', (req, res, b, p, u, c) => {
   q('UPDATE books SET title=? WHERE id=? AND class_id=?').run(str(b.title, 120) || 'Учебник', int(p.id), c.id);
   send(res, 200, { ok: true });

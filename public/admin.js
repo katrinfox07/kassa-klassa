@@ -596,16 +596,68 @@ VIEWS['учебники'] = () => {
   } },
     h('label.field', 'PDF-файл учебника', file), h('label.field', 'Название', title), bar, note, btn,
     h('p.hint', 'После загрузки сайт сам сожмёт учебник в лёгкие картинки-страницы (несколько минут), и он появится у родителей во вкладке «Учебники».'));
-  const rows = S.books.map(b => h('div.book-row',
+  const rows = S.books.map((b, i) => h('div.book-row',
     b.status === 'ready' ? h('img', { src: `/b/${b.id}/1.jpg`, alt: '' }) : h('div.book-ph.small', b.status === 'error' ? '⚠' : '⏳'),
     h('div.grow', h('b', b.title), h('div.small.muted', b.status === 'ready' ? b.pages + ' стр.' : b.status === 'error' ? 'Ошибка: ' + b.error : 'Сжимаем страницы… это займёт несколько минут')),
+    h('span.row', { style: 'gap:2px' },
+      h('button.btn.small', { 'aria-label': 'Выше', disabled: i === 0, onclick: () => moveBook(i, -1) }, '↑'),
+      h('button.btn.small', { 'aria-label': 'Ниже', disabled: i === S.books.length - 1, onclick: () => moveBook(i, 1) }, '↓')),
     b.status === 'ready' ? h('button.btn.small', { onclick: () => openReader(b) }, 'Открыть') : null,
     h('button.btn.small', { onclick: () => { const close = modal('Название', h('form.form', { onsubmit: async e => { e.preventDefault(); await act(() => api('PUT', '/api/admin/books/' + b.id, { title: e.target.t.value }), 'Сохранено')(); close(); } },
       h('input', { name: 't', value: b.title, maxlength: 120 }), h('button.btn.primary', { type: 'submit' }, 'Сохранить'))); } }, '✎'),
     h('button.btn.small.danger', { onclick: () => confirmInline(() => {}, `Удалить учебник «${b.title}»?`, async () => { await api('DELETE', '/api/admin/books/' + b.id); toast('Удалено'); load(); }) }, '✕')));
   const ready = S.books.filter(b => b.status === 'ready');
   return h('div.stack.books-admin',
-    ready.length ? h('section.card', h('h3', '📖 Читать'), h('p.small.muted', 'Так учебники видят родители. Нажмите на обложку, чтобы листать.'), booksGrid(ready)) : null,
+    ready.length ? h('section.card', h('h3', '📖 Читать'), h('p.small.muted', 'Так учебники видят родители. Нажмите на обложку, чтобы листать. Чтобы поменять порядок, перетащите обложку (на телефоне - подержите и тяните).'), sortableBooks(booksGrid(ready))) : null,
     h('section.card', h('h3', '📚 Учебники'), rows.length ? h('div.stack', rows) : h('p.muted', 'Пока пусто. Загрузите первый учебник ниже.')),
     h('section.card', h('h3', 'Добавить учебник'), form));
 };
+
+// перетаскивание обложек: мышью сразу, на телефоне после короткого удержания
+function sortableBooks(grid) {
+  let drag = null, timer = null, start = null, moved = false;
+  const cards = () => [...grid.querySelectorAll('.book')];
+  const begin = (el, e) => { drag = el; el.classList.add('dragging'); grid.classList.add('sorting'); try { el.setPointerCapture(e.pointerId); } catch {} if (navigator.vibrate) navigator.vibrate(15); };
+  grid.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.book'); if (!el) return;
+    start = { x: e.clientX, y: e.clientY, el, id: e.pointerId }; moved = false;
+    if (e.pointerType === 'mouse') return; // мышью начинаем при движении
+    timer = setTimeout(() => begin(el, e), 350);
+  });
+  grid.addEventListener('pointermove', e => {
+    if (!start) return;
+    const dist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    if (!drag) {
+      if (e.pointerType === 'mouse' && dist > 6) begin(start.el, e);
+      else if (dist > 10) { clearTimeout(timer); start = null; } // это прокрутка
+      return;
+    }
+    e.preventDefault(); moved = true;
+    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.book');
+    if (over && over !== drag && over.parentNode === grid) {
+      const list = cards(), a = list.indexOf(drag), b = list.indexOf(over);
+      grid.insertBefore(drag, a < b ? over.nextSibling : over);
+    }
+  });
+  const end = async () => {
+    clearTimeout(timer);
+    if (drag) {
+      drag.classList.remove('dragging'); grid.classList.remove('sorting');
+      const el = drag; drag = null;
+      if (moved) {
+        el.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+        const order = cards().map(c => +c.dataset.id), rest = S.books.map(b => b.id).filter(id => !order.includes(id));
+        try { await api('PUT', '/api/admin/books-order', { ids: [...order, ...rest] }); toast('Порядок сохранён'); load(); } catch (err) { toast(err.message, true); }
+      }
+    }
+    start = null;
+  };
+  grid.addEventListener('pointerup', end); grid.addEventListener('pointercancel', end);
+  grid.addEventListener('contextmenu', e => { if (e.target.closest('.book')) e.preventDefault(); });
+  return grid;
+}
+
+function moveBook(i, d) {
+  const ids = S.books.map(b => b.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
+  act(() => api('PUT', '/api/admin/books-order', { ids }))();
+}

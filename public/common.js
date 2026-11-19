@@ -416,7 +416,7 @@ function parentRows(s) {
 // ---------- Учебники: обложки и читалка ----------
 function booksGrid(books, onOpen) {
   if (!books.length) return h('p.muted', 'Учебников пока нет.');
-  return h('div.books', books.map(b => h('button.book', { type: 'button', onclick: () => (onOpen || openReader)(b) },
+  return h('div.books', books.map(b => h('button.book', { type: 'button', 'data-id': b.id, onclick: () => (onOpen || openReader)(b) },
     b.status === 'ready' ? h('img', { src: `/b/${b.id}/1.jpg`, alt: '', loading: 'lazy' }) : h('div.book-ph', b.status === 'error' ? '⚠' : '⏳'),
     h('span.book-t', b.title), h('span.book-n', b.status === 'ready' ? b.pages + ' стр.' : b.status === 'error' ? 'ошибка' : 'обрабатывается…'))));
 }
