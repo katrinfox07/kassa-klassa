@@ -623,3 +623,4 @@ div.field .linklike { justify-self: start; }
 @keyframes breathe { 0%, 100% { box-shadow: 0 6px 18px rgba(108,76,230,.22); } 50% { box-shadow: 0 6px 24px rgba(108,76,230,.4), 0 0 0 3px rgba(139,92,246,.12); } }
 @keyframes breatheA { 0%, 100% { box-shadow: 0 0 0 0 rgba(91,91,240,0); } 50% { box-shadow: 0 0 0 4px rgba(91,91,240,.16); } }
 @keyframes breatheG { 0%, 100% { box-shadow: 0 0 0 0 rgba(31,157,85,0); } 50% { box-shadow: 0 0 0 4px rgba(31,157,85,.18); } }
+.sched-warn { color: var(--bad); font-size: 13px; font-weight: 700; margin: -4px 0 10px; }
