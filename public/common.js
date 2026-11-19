@@ -421,33 +421,107 @@ function booksGrid(books, onOpen) {
     h('span.book-t', b.title), h('span.book-n', b.status === 'ready' ? b.pages + ' стр.' : b.status === 'error' ? 'ошибка' : 'обрабатывается…'))));
 }
 function openReader(b) {
-  const key = 'book-page-' + b.id;
-  let last = 1; try { last = +localStorage.getItem(key) || 1; } catch {}
-  let zoom = 1;
-  const cnt = h('input.rd-page', { type: 'number', min: 1, max: b.pages, value: last, inputmode: 'numeric', 'aria-label': 'Страница' });
-  const pages = h('div.rd-pages');
-  const imgs = Array.from({ length: b.pages }, (_, i) => h('img.rd-img', { src: `/b/${b.id}/${i + 1}.jpg`, loading: i < 2 || Math.abs(i + 1 - last) < 2 ? 'eager' : 'lazy', alt: 'Страница ' + (i + 1), 'data-n': i + 1 }));
-  imgs.forEach((im, i) => im.addEventListener('load', () => { if (i === 0) pages.style.setProperty('--ar', im.naturalWidth / im.naturalHeight); im.classList.add('ld'); }));
-  pages.append(...imgs);
-  const close = () => { wrap.remove(); document.body.classList.remove('noscroll'); obs.disconnect(); };
-  const go = n => { n = Math.min(b.pages, Math.max(1, n | 0)); imgs[n - 1].scrollIntoView({ block: 'start' }); };
-  const setZoom = z => { const n = +cnt.value || 1; zoom = z; pages.style.setProperty('--z', zoom); zl.textContent = Math.round(zoom * 100) + '%'; requestAnimationFrame(() => go(n)); };
+  const N = b.pages, src = n => `/b/${b.id}/${n}.jpg`, key = 'book-page-' + b.id;
+  let page = 1; try { page = Math.min(N, Math.max(1, +localStorage.getItem(key) || 1)); } catch {}
+  let ar = 0.74, zoom = 1, busy = false;
+  const isSpread = () => innerWidth >= 760 && innerWidth > innerHeight * 1.15;
+  // в развороте: обложка одна справа, дальше пары 2-3, 4-5...
+  const spreadOf = n => n <= 1 ? [0, 1] : (n % 2 === 0 ? [n, n + 1 <= N ? n + 1 : 0] : [n - 1, n]);
+  const cache = new Map();
+  const img = n => { if (!n || n > N) return null; if (!cache.has(n)) { const i = new Image(); i.src = src(n); i.alt = 'Страница ' + n; i.draggable = false; cache.set(n, i); } return cache.get(n); };
+  const pg = n => { const d = h('div.fp-page'); const i = img(n); if (i) d.append(i.cloneNode()); else d.classList.add('blank'); return d; };
+  const preload = () => { for (let d = -2; d <= 4; d++) img(page + d); };
+
+  const cnt = h('input.rd-page', { type: 'number', min: 1, max: N, value: page, inputmode: 'numeric', 'aria-label': 'Страница' });
   const zl = h('span.rd-zl', '100%');
+  const book = h('div.fp-book');
+  const stage = h('div.fp-stage', book);
+  const prevB = h('button.fp-nav.prev', { 'aria-label': 'Назад', onclick: () => flip(-1) }, '‹');
+  const nextB = h('button.fp-nav.next', { 'aria-label': 'Вперёд', onclick: () => flip(1) }, '›');
+  const view = h('div.fp-view', stage, prevB, nextB);
+
+  const size = () => {
+    const sp = isSpread(), vw = view.clientWidth - (sp ? 120 : 16), vh = view.clientHeight - 16;
+    let ph = Math.min(vh, (sp ? vw / 2 : vw) / ar), pw = ph * ar;
+    book.style.width = (sp ? pw * 2 : pw) * zoom + 'px'; book.style.height = ph * zoom + 'px';
+    book.classList.toggle('spread', sp);
+    stage.classList.toggle('zoomed', zoom > 1);
+  };
+  const render = () => {
+    const sp = isSpread();
+    book.replaceChildren();
+    if (sp) { const [l, r] = spreadOf(page); book.append(h('div.fp-half.left', pg(l)), h('div.fp-half.right', pg(r))); }
+    else book.append(h('div.fp-half.single', pg(page)));
+    cnt.value = page; prevB.disabled = page <= 1; nextB.disabled = sp ? spreadOf(page)[1] >= N || !spreadOf(page)[1] : page >= N;
+    try { localStorage.setItem(key, page); } catch {}
+    preload(); size();
+  };
+  const target = d => {
+    if (!isSpread()) return page + d;
+    const [l, r] = spreadOf(page);
+    return d > 0 ? (r || l) + 1 : (l <= 1 ? 1 : l - 1);
+  };
+  // перелистывание с анимацией листа
+  function flip(d) {
+    if (busy || zoom > 1) return;
+    const t = target(d); if (t < 1 || t > N) return;
+    busy = true;
+    const sp = isSpread(), oldPage = page;
+    page = t;
+    if (sp) {
+      const [ol, or] = spreadOf(oldPage), [nl, nr] = spreadOf(page);
+      // под листом сразу показываем новые страницы с нужной стороны
+      book.replaceChildren(
+        h('div.fp-half.left', pg(d > 0 ? ol : nl)), h('div.fp-half.right', pg(d > 0 ? nr : or)));
+      const leaf = h('div.fp-leaf' + (d > 0 ? '.fwd' : '.back'),
+        h('div.fp-face.front', pg(d > 0 ? or : ol)), h('div.fp-face.backside', pg(d > 0 ? nl : nr)));
+      book.append(leaf);
+      requestAnimationFrame(() => requestAnimationFrame(() => leaf.classList.add('go')));
+    } else {
+      const under = h('div.fp-half.single', pg(d > 0 ? page : oldPage));
+      const leaf = h('div.fp-leaf.single' + (d > 0 ? '.fwd' : '.back'), h('div.fp-face.front', pg(d > 0 ? oldPage : page)));
+      book.replaceChildren(under, leaf);
+      requestAnimationFrame(() => requestAnimationFrame(() => leaf.classList.add('go')));
+    }
+    setTimeout(() => { busy = false; render(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 620);
+  }
+  const go = n => { page = Math.min(N, Math.max(1, n | 0)); render(); };
+  const setZoom = z => { zoom = z; zl.textContent = Math.round(zoom * 100) + '%'; size(); };
+
+  // свайп и нажатия по краям
+  let sx = null, sy = 0, st = 0;
+  view.addEventListener('pointerdown', e => { if (zoom > 1 || e.target.closest('button')) return; sx = e.clientX; sy = e.clientY; st = Date.now(); });
+  view.addEventListener('pointerup', e => {
+    if (sx === null) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) return flip(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && Date.now() - st < 400) {
+      const r = view.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+      if (x < .3) flip(-1); else if (x > .7) flip(1);
+    }
+  });
+  view.addEventListener('dblclick', () => setZoom(zoom > 1 ? 1 : 2));
+
   cnt.addEventListener('change', () => go(+cnt.value));
+  const close = () => { wrap.remove(); document.body.classList.remove('noscroll'); removeEventListener('resize', onResize); document.removeEventListener('keydown', onKey); };
+  const onResize = () => render();
+  const onKey = e => {
+    if (e.target === cnt) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); flip(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); flip(-1); }
+  };
   const wrap = h('div.reader', { role: 'dialog', 'aria-modal': 'true' },
     h('div.rd-bar',
       h('button.icon-btn', { onclick: close, 'aria-label': 'Закрыть' }, '✕'),
       h('b.rd-title', b.title),
-      h('span.rd-pg', cnt, h('span', ' / ' + b.pages)),
+      h('span.rd-pg', cnt, h('span', ' / ' + N)),
       h('span.rd-zoom', h('button.icon-btn', { onclick: () => setZoom(Math.max(1, zoom - .5)), 'aria-label': 'Мельче' }, '−'), zl,
         h('button.icon-btn', { onclick: () => setZoom(Math.min(3, zoom + .5)), 'aria-label': 'Крупнее' }, '+'))),
-    pages);
+    view);
   document.body.append(wrap); document.body.classList.add('noscroll');
-  const obs = new IntersectionObserver(es => {
-    for (const e of es) if (e.isIntersecting) { const n = +e.target.dataset.n; if (document.activeElement !== cnt) cnt.value = n; try { localStorage.setItem(key, n); } catch {} }
-  }, { root: pages, rootMargin: '-45% 0px -45% 0px' });
-  imgs.forEach(i => obs.observe(i));
-  if (last > 1) setTimeout(() => go(last), 50);
-  const onKey = e => { if (!wrap.isConnected) return document.removeEventListener('keydown', onKey); if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
+  addEventListener('resize', onResize); document.addEventListener('keydown', onKey);
+  const first = img(1);
+  const start = () => { if (first.naturalWidth) ar = first.naturalWidth / first.naturalHeight; render(); };
+  if (first.complete && first.naturalWidth) start(); else { first.onload = start; first.onerror = start; render(); }
 }
