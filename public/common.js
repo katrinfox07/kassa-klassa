@@ -187,7 +187,7 @@ function scheduleCard(info) {
         live ? h('span.lleft', h('i.pdot'), 'ещё ' + left(to - mins)) : h('span'),
         live ? h('div.lbar', h('div', { style: `width:${pct}%` })) : null));
       const nb = bells[i + 1];
-      if (i < n - 1 && b.to && nb?.from && !empty && !isEmpty(i + 1)) {
+      if (i < n - 1 && b.to && nb?.from) {
         const len = toM(nb.from) - toM(b.to);
         const bl = todayOn && mins >= toM(b.to) && mins < toM(nb.from);
         if (len > 0) rows.push(h('div.brk' + (bl ? '.live' : '') + (b.after ? '.food' : ''), st(), h('span.brk-line'),
