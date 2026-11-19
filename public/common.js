@@ -313,7 +313,7 @@ const BANKS = [
   { re: /(^|\.)vtb\.ru$/, name: 'ВТБ', color: '#0A2896' },
   { re: /(^|\.)(tbank|tinkoff|tb)\.ru$|(^|\.)tbank-online\.com$/, name: 'Т-Банк', color: '#FFDD2D', ink: '#222', note: 'для клиентов Т-Банка' },
   { re: /(^|\.)alfabank\.ru$|(^|\.)alfa\.me$/, name: 'Альфа-Банк', color: '#EF3124' },
-  { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF', title: 'Перевод по СБП', note: 'из любого банка · через Озон Банк' },
+  { re: /(^|\.)(ozon|ozonbank|finance\.ozon)\.ru$/, name: 'Озон Банк', color: '#005BFF', title: 'Перевод по СБП', note: 'из любого банка' },
   { re: /(^|\.)gazprombank\.ru$/, name: 'Газпромбанк', color: '#0F2D69' },
   { re: /(^|\.)yoomoney\.ru$/, name: 'ЮMoney', color: '#8B3FFD' },
 ];
