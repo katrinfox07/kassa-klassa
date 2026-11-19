@@ -100,6 +100,8 @@ function tabs(el, list, onChange) {
   pick(list.some(t => t.id === cur) ? cur : list[0].id);
 }
 
+// участвует ли ребёнок в сборе (казначей может снять галочку)
+const inColl = (c, s) => !(c.skip || []).includes(s.id);
 function statusOf(st, collection, studentId) {
   const ps = st.payments.filter(p => p.collection_id === collection.id && p.student_id === studentId);
   const conf = ps.filter(p => p.status === 'confirmed');

@@ -84,6 +84,7 @@ for (const r of q("SELECT id, parent FROM students WHERE phone='' AND parent<>''
 try { db.exec('ALTER TABLE collections ADD COLUMN separate INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec("ALTER TABLE collections ADD COLUMN qr TEXT NOT NULL DEFAULT ''"); } catch {}
 try { db.exec('ALTER TABLE collections ADD COLUMN flex INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE collections ADD COLUMN skip TEXT NOT NULL DEFAULT '[]'"); } catch {}
 if (!getSettingRaw('mig_photo_flex')) {
   db.exec("UPDATE collections SET flex=1 WHERE title='Фотографии' AND description LIKE '1 фото%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_flex', '1')").run();
@@ -303,6 +304,7 @@ const addDays = (d, n) => { const t = new Date((d > today() ? d : today()) + 'T0
 const TRANSLIT = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' };
 const slugify = s => String(s || '').toLowerCase().split('').map(c => TRANSLIT[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 const RESERVED = new Set(['api', 'admin', 'owner', 'account', 'login', 'uploads', 'static', 'www', 'c', 'kassa', 'help', 'oferta', 'privacy']);
+const skipList = v => JSON.stringify((Array.isArray(v) ? v : []).map(Number).filter(Number.isInteger).slice(0, 200));
 function freeSlug(base) {
   let s = slugify(base) || 'klass'; if (s.length < 3 || RESERVED.has(s)) s = 'klass-' + s;
   let cand = s, i = 2;
@@ -326,10 +328,11 @@ function classState(c, admin) {
   const spent = expenses.filter(e => !sep.has(e.collection_id)).reduce((s, e) => s + e.amount, 0);
   const activeCount = students.filter(s => s.active).length;
   for (const k of collections) {
+    try { k.skip = JSON.parse(k.skip || '[]'); } catch { k.skip = []; }
     const ps = payments.filter(p => p.collection_id === k.id);
     k.collected = ps.filter(p => p.status === 'confirmed').reduce((s, p) => s + p.amount, 0);
     k.pending = ps.filter(p => p.status === 'pending').length;
-    k.expected = k.flex ? 0 : k.amount * activeCount;
+    k.expected = k.flex ? 0 : k.amount * students.filter(x => x.active && !k.skip.includes(x.id)).length;
     k.spent = expenses.filter(e => e.collection_id === k.id).reduce((s, e) => s + e.amount, 0);
   }
   return {
@@ -543,13 +546,13 @@ const collectionFields = b => {
   return [title, str(b.description, 2000), amount, isDate(b.due_date) ? b.due_date : null, okLinks(b.pay_link)];
 };
 route('POST', '/admin/collections', (req, res, b, p, u, c) => {
-  const r = q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, flex, class_id) VALUES(?,?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, b.flex ? 1 : 0, c.id);
+  const r = q('INSERT INTO collections(title, description, amount, due_date, pay_link, separate, flex, skip, class_id) VALUES(?,?,?,?,?,?,?,?,?)').run(...collectionFields(b), b.separate ? 1 : 0, b.flex ? 1 : 0, skipList(b.skip), c.id);
   if (b.qr) q('UPDATE collections SET qr=? WHERE id=?').run(saveImage(b.qr, 'qr'), r.lastInsertRowid);
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/collections/:id', (req, res, b, p, u, c) => {
-  q('UPDATE collections SET title=?, description=?, amount=?, due_date=?, pay_link=?, closed=?, separate=?, flex=? WHERE id=? AND class_id=?')
-    .run(...collectionFields(b), b.closed ? 1 : 0, b.separate ? 1 : 0, b.flex ? 1 : 0, int(p.id), c.id);
+  q('UPDATE collections SET title=?, description=?, amount=?, due_date=?, pay_link=?, closed=?, separate=?, flex=?, skip=? WHERE id=? AND class_id=?')
+    .run(...collectionFields(b), b.closed ? 1 : 0, b.separate ? 1 : 0, b.flex ? 1 : 0, skipList(b.skip), int(p.id), c.id);
   if (b.qr || b.qr_remove) {
     const old = q('SELECT qr FROM collections WHERE id=? AND class_id=?').get(int(p.id), c.id);
     if (old) { rmFile(old.qr); q('UPDATE collections SET qr=? WHERE id=?').run(b.qr ? saveImage(b.qr, 'qr') : '', int(p.id)); }

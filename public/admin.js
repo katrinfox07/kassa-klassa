@@ -91,7 +91,7 @@ VIEWS['сборы'] = () => {
 };
 
 function collectionAdminCard(c) {
-  const active = S.students.filter(s => s.active);
+  const active = S.students.filter(s => s.active && inColl(c, s));
   const paid = active.filter(s => statusOf(S, c, s.id).s === 'paid').length;
   const det = h('details.more', { open: openColl.has(c.id), ontoggle: e => e.target.open ? openColl.add(c.id) : openColl.delete(c.id) },
     h('summary', 'Таблица оплат'), collectionTable(c));
@@ -111,7 +111,7 @@ function collectionAdminCard(c) {
 }
 
 function collectionTable(c) {
-  const rows = S.students.filter(s => s.active || S.payments.some(p => p.student_id === s.id && p.collection_id === c.id)).map(s => {
+  const rows = S.students.filter(s => (s.active && inColl(c, s)) || S.payments.some(p => p.student_id === s.id && p.collection_id === c.id)).map(s => {
     const st = statusOf(S, c, s.id);
     const pend = st.list.find(p => p.status === 'pending');
     const conf = st.list.filter(p => p.status === 'confirmed');
@@ -161,6 +161,19 @@ function collectionDialog(c) {
     flex: h('input', { type: 'checkbox', checked: !!c.flex }),
     separate: h('select', h('option', { value: '1', selected: !!c.separate }, 'Досбор - на конкретное дело (кино, фото, подарок)'), h('option', { value: '', selected: !c.separate }, 'Взнос в кассу класса')),
   };
+  // кто участвует: по умолчанию все, можно снять галочки
+  const skip0 = new Set(c.skip || []);
+  const kidsAll = S.students.filter(s => s.active);
+  const boxes = kidsAll.map(s => h('input', { type: 'checkbox', checked: !skip0.has(s.id), 'data-id': s.id }));
+  const partSum = h('span');
+  const updPart = () => { const n = boxes.filter(b => b.checked).length; partSum.textContent = n === kidsAll.length ? `все ${n}` : `${n} из ${kidsAll.length}`; };
+  boxes.forEach(b => b.addEventListener('change', updPart)); updPart();
+  const setAll = v => () => { boxes.forEach(b => { b.checked = v; }); updPart(); };
+  const partBox = h('details.part', skip0.size ? { open: true } : {},
+    h('summary', 'Кто участвует: ', h('b', partSum)),
+    h('div.row', { style: 'gap:12px;margin:6px 0' }, h('button.linklike', { type: 'button', onclick: setAll(true) }, 'отметить всех'), h('button.linklike', { type: 'button', onclick: setAll(false) }, 'снять всех')),
+    h('div.part-list', kidsAll.map((s, i) => h('label.check', boxes[i], s.name))),
+    h('span.hint', 'Кто не участвует, не попадёт в список должников и в общую сумму.'));
   const links = h('div');
   const addLink = v => {
     const chip = h('span');
@@ -182,6 +195,7 @@ function collectionDialog(c) {
     onsubmit: async e => {
       e.preventDefault();
       const body = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.type === 'checkbox' ? el.checked : el.value]));
+      body.skip = boxes.filter(b => !b.checked).map(b => +b.dataset.id);
       body.pay_link = [...links.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean).join('\n');
       if (qrFile.files[0]) body.qr = await compressImage(qrFile.files[0], 1000); else if (qrRemove) body.qr_remove = true;
       try { await api(isNew ? 'POST' : 'PUT', '/api/admin/collections' + (isNew ? '' : '/' + c.id), body); close(); toast('Сохранено'); load(); }
@@ -191,6 +205,7 @@ function collectionDialog(c) {
     h('label.field', 'Тип сбора', f.separate),
     h('label.field', 'Название', f.title),
     h('div.two', h('label.field', 'С каждого ребёнка, ₽', f.amount), h('label.field', 'Сдать до', f.due_date)),
+    partBox,
     h('div.field', h('span', 'Ссылки на сбор в банках'), links,
       h('button.linklike', { type: 'button', onclick: () => addLink('') }, '+ ещё банк'),
       h('span.hint', 'Создайте сбор в приложении банка и вставьте ссылку. Можно в нескольких банках: у родителей появится выбор со значками банков.')),
@@ -216,8 +231,8 @@ function confirmInline(closePrev, text, onYes) {
 }
 
 function remind(c) {
-  const notPaid = S.students.filter(s => s.active && statusOf(S, c, s.id).s === 'none').map(s => s.name);
-  const debts = S.students.filter(s => s.active).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
+  const notPaid = S.students.filter(s => s.active && inColl(c, s) && statusOf(S, c, s.id).s === 'none').map(s => s.name);
+  const debts = S.students.filter(s => s.active && inColl(c, s)).map(s => [s, statusOf(S, c, s.id)]).filter(([, x]) => x.s === 'partial').map(([s, x]) => `${s.name} (${rub(x.debt)})`);
   const url = classUrl();
   const ownPrices = /₽|руб/i.test(c.description || '');
   const text = `Уважаемые родители! Идёт сбор «${c.title}»` + (c.amount && !ownPrices ? ` - ${rub(c.amount)} с ребёнка` : '') + (c.due_date ? `, до ${fdate(c.due_date)}` : '') + '.\n' +

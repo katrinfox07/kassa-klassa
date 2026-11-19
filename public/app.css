@@ -626,3 +626,7 @@ div.field .linklike { justify-self: start; }
 .sched-warn { color: var(--bad); font-size: 13px; font-weight: 700; margin: -4px 0 10px; }
 .sched-today { font-size: 14px; color: var(--muted); margin: 0 0 8px; } .sched-today b { color: var(--text); }
 .kid-parent { align-self: center; }
+details.part { background: var(--bg); border-radius: 12px; padding: 8px 12px; }
+details.part summary { cursor: pointer; font-size: 14px; }
+.part-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 2px 12px; max-height: 260px; overflow: auto; margin-bottom: 6px; }
+.part-list .check { font-size: 14px; }

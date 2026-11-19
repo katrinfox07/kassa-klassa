@@ -39,7 +39,7 @@ function collectionsView() {
 }
 
 function collectionCard(c) {
-  const kids = S.students.map(s => ({ s, st: statusOf(S, c, s.id) }));
+  const kids = S.students.filter(s => inColl(c, s) || S.payments.some(p => p.student_id === s.id && p.collection_id === c.id)).map(s => ({ s, st: statusOf(S, c, s.id) }));
   const paid = kids.filter(k => k.st.s === 'paid').length;
   const dl = c.due_date ? daysLeft(c.due_date) : null;
   const due = c.due_date ? h('span.pill' + (c.closed ? '' : dl < 0 ? '.bad' : dl <= 3 ? '.warn' : '.blue'),
@@ -49,7 +49,7 @@ function collectionCard(c) {
     /₽|руб/i.test(c.description || '') ? null : h('div.meta', c.amount ? `${c.flex ? 'от ' : ''}${rub(c.amount)} с ребёнка` : 'Сумма свободная'),
     c.description ? h('p.pre', { style: 'margin-top:8px' }, c.description) : null,
     c.expected ? progress(c) : null,
-    h('div.row.between.small', h('span', `Сдали ${paid} из ${S.students.length}`, (n => n ? h('span.muted', ` · частично ${n}`) : null)(kids.filter(k => k.st.s === 'partial').length)), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
+    h('div.row.between.small', h('span', `Сдали ${paid} из ${kids.length}`, (n => n ? h('span.muted', ` · частично ${n}`) : null)(kids.filter(k => k.st.s === 'partial').length)), h('span.muted', `${rub(c.collected)}${c.expected ? ' из ' + rub(c.expected) : ''}`)),
     !c.closed ? h('div.row', { style: 'margin-top:12px' }, h('button.btn.primary.grow', { onclick: () => payDialog(c) }, 'Оплатить')) : null,
     h('details.more', h('summary', 'Кто сдал'),
       h('ul.kids', kids.map(({ s, st }) => h('li.' + st.s,
@@ -62,7 +62,7 @@ function collectionCard(c) {
 
 function payDialog(c) {
   const sel = h('select', { required: true }, h('option', { value: '' }, 'Выберите ребёнка'),
-    S.students.map(s => {
+    S.students.filter(s => inColl(c, s)).map(s => {
       const x = statusOf(S, c, s.id), st = x.s;
       return h('option', { value: s.id, disabled: st === 'paid', 'data-debt': x.debt || '' }, s.name + (st === 'paid' ? ' - оплачено' : st === 'partial' ? ' - доплатить ' + rub(x.debt) : st === 'pending' ? ' - ждёт подтверждения' : ''));
     }));
