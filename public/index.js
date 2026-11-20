@@ -1,11 +1,14 @@
 'use strict';
 // Общая страница для родителей
 let S = null;
-// версия для учителя: без сборов, денег и чеков
-const TEACHER = /\/klassruk\/?$/.test(location.pathname);
-// личная ссылка учителя-предметника: /c/<класс>/t/<код>
-const TUTOR = (/\/t\/([A-Za-z0-9]{8,20})\/?$/.exec(location.pathname) || [])[1] || null;
+// общая страница учителей /c/<класс>/uchitel: вход по ПИН-коду из 4 цифр, без сборов и денег
+const TEACHER = /\/uchitel\/?$/.test(location.pathname);
+// старая личная ссылка учителя: /c/<класс>/t/<код>
+let TUTOR = (/\/t\/([A-Za-z0-9]{8,20})\/?$/.exec(location.pathname) || [])[1] || null;
 let TU = null;
+const TU_KEY = 'tu-' + SLUG;
+const tuGet = () => { try { return localStorage.getItem(TU_KEY); } catch { return null; } };
+const tuSet = v => { try { v ? localStorage.setItem(TU_KEY, v) : localStorage.removeItem(TU_KEY); } catch {} };
 
 async function load() {
   try { S = await api('GET', '/api/public'); }
@@ -14,28 +17,24 @@ async function load() {
   $('#title').textContent = S.class.title;
   $('#sub').textContent = '';
   $('#install').replaceChildren(installButton() || '');
-  if (TUTOR) {
-    try { TU = (await api('GET', `/api/t/${TUTOR}/day`)).tutor; }
-    catch (e) { $('#main').replaceChildren(h('p.empty', e.message)); $('#totals').hidden = true; return; }
-    $('#sub').textContent = TU.name + (TU.subject ? ' · ' + TU.subject : '');
+  if (TEACHER && !TUTOR) TUTOR = tuGet();
+  if (TEACHER || TUTOR) {
     $('#totals').replaceChildren(); $('#totals').hidden = true;
-    $('#install').replaceChildren();
+    if (!TUTOR) return pinScreen();
+    try { TU = (await api('GET', `/api/t/${TUTOR}/day`)).tutor; }
+    catch (e) {
+      if (TEACHER && e.status === 404) { tuSet(null); TUTOR = null; return pinScreen('ПИН сменился. Введите новый.'); }
+      $('#main').replaceChildren(h('p.empty', e.message)); return;
+    }
+    $('#sub').textContent = TU.name + (TU.subject ? ' · ' + TU.subject : '');
+    if (TEACHER) $('#install').replaceChildren(h('button.btn.small', { style: 'background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.4)', onclick: () => { tuSet(null); location.reload(); } }, 'Выйти'));
+    else $('#install').replaceChildren();
     return tabs($('#tabs'), [
       { id: 'урок', label: 'Сегодня на уроке' },
       ...(TU.head ? [{ id: 'журнал', label: 'Журнал' }] : []),
       { id: 'инфо', label: 'Информация' },
       ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
-    ], show);
-  }
-  if (TEACHER) {
-    $('#sub').textContent = 'Для классного руководителя';
-    $('#totals').replaceChildren(); $('#totals').hidden = true;
-    return tabs($('#tabs'), [
-      { id: 'инфо', label: 'Информация' },
-      ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
-      { id: 'урок', label: 'Сегодня на уроке' },
-      { id: 'журнал', label: 'Журнал' },
-      { id: 'класс', label: 'Список класса' },
+      ...(TU.head ? [{ id: 'класс', label: 'Список класса' }] : []),
     ], show);
   }
   $('#totals').replaceChildren(
@@ -53,10 +52,8 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
-  if ((id === 'урок' || id === 'журнал') && TEACHER && !krToken()) return m.replaceChildren(pinView(() => show(id)));
-  const tok = TUTOR || krToken();
-  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${tok}`));
-  if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${tok}/journal`, S.students));
+  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`));
+  if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
   if (id === 'класс') m.replaceChildren(rosterView());
@@ -64,22 +61,24 @@ function show(id) {
   if (id === 'учебники') m.replaceChildren(h('section.card', h('h3', '📚 Учебники'), h('p.small.muted', 'Нажмите на учебник, чтобы читать. Листайте вниз, кнопки «+» и «−» увеличивают страницу.'), booksGrid(S.books)));
 }
 
-// Классрук на /klassruk: отметки детей открываются ПИН-кодом (один раз на устройстве)
-const KR_KEY = 'kr-' + SLUG;
-function krToken() { try { return localStorage.getItem(KR_KEY) || TOKEN_MEM; } catch { return TOKEN_MEM; } }
-function pinView(done) {
-  const inp = h('input', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6 цифр', style: 'font-size:22px;letter-spacing:6px;text-align:center' });
+// вход учителя по ПИН-коду (запоминается на этом устройстве до «Выйти»)
+function pinScreen(msg) {
+  $('#sub').textContent = 'Для учителей';
+  $('#tabs').replaceChildren();
+  const inp = h('input.pin-in', { inputmode: 'numeric', autocomplete: 'off', maxlength: 4, placeholder: '••••', 'aria-label': 'ПИН-код',
+    oninput: e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); if (e.target.value.length === 4) go(); } });
+  const err = h('p.pin-err', msg || '');
+  let busy = false;
   const go = async e => {
-    e.preventDefault();
-    try { const r = await api('POST', '/api/klassruk/unlock', { pin: inp.value }); try { localStorage.setItem(KR_KEY, r.token); } catch {} ; TOKEN_MEM = r.token; done(); }
-    catch (er) { toast(er.message, true); }
+    e?.preventDefault(); if (busy || inp.value.length !== 4) return; busy = true;
+    try { const r = await api('POST', '/api/uchitel/unlock', { pin: inp.value }); tuSet(r.token); location.reload(); }
+    catch (er) { err.textContent = er.message; inp.value = ''; inp.focus(); busy = false; }
   };
-  return h('section.card.form', h('h3', '🔒 Отметки детей'),
-    h('p', 'Здесь «Сегодня на уроке» и журнал отметок от всех учителей. Чтобы их не увидели посторонние, введите ПИН классного руководителя. Это нужно один раз на этом телефоне.'),
-    h('form.form', { onsubmit: go }, inp, h('button.btn.primary', 'Открыть')),
-    h('p.hint', 'ПИН есть у казначея класса.'));
+  $('#main').replaceChildren(h('section.card.form.pin-card', h('div.pin-ic', '🔒'), h('h3', 'Вход для учителя'),
+    h('p.muted', 'Введите свой ПИН-код из 4 цифр. Его выдаёт казначей класса.'),
+    h('form', { onsubmit: go }, inp, err, h('button.btn.primary', { style: 'width:100%' }, 'Войти'))));
+  setTimeout(() => inp.focus(), 50);
 }
-let TOKEN_MEM = null;
 
 function collectionsView() {
   const wrap = h('div.stack');

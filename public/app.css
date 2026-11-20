@@ -725,3 +725,9 @@ details.part summary { cursor: pointer; font-size: 14px; }
 @media (max-width: 420px) { .lbtn { padding: 6px 7px; font-size: 12.5px; } }
 .tutor { background: var(--bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; }
 .tutor input.small { font-size: 13px; }
+.pin-card { max-width: 380px; margin: 12px auto; text-align: center; }
+.pin-ic { font-size: 40px; }
+.pin-in { font-size: 32px !important; letter-spacing: 14px; text-align: center; height: 64px; font-weight: 800; }
+.pin-err { color: var(--bad, #d33); min-height: 1.3em; margin: 8px 0; font-weight: 600; }
+.tpin { font-size: 20px; letter-spacing: 4px; }
+.pin-card h3 { justify-content: center; text-align: center; }

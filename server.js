@@ -836,9 +836,9 @@ CREATE TABLE IF NOT EXISTS marks (id INTEGER PRIMARY KEY, class_id INTEGER NOT N
   updated_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(tutor_id, student_id, date))`);
 try { db.exec('ALTER TABLE tutors ADD COLUMN head INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec("ALTER TABLE tutors ADD COLUMN pin TEXT NOT NULL DEFAULT ''"); } catch {}
-const newPin = () => String(crypto.randomInt(100000, 1000000));
-// ПИН для классного руководителя: открывает отметки на странице /klassruk
-const ensurePins = () => { for (const t of q("SELECT id FROM tutors WHERE head=1 AND pin=''").all()) q('UPDATE tutors SET pin=? WHERE id=?').run(newPin(), t.id); };
+// ПИН из 4 цифр у каждого учителя (свой в пределах класса): вход на общей странице /uchitel
+const newPin = cid => { for (let i = 0; i < 200; i++) { const x = String(crypto.randomInt(1000, 10000)); if (!q('SELECT 1 FROM tutors WHERE class_id=? AND pin=?').get(cid, x)) return x; } return String(crypto.randomInt(1000, 10000)); };
+const ensurePins = () => { for (const t of q("SELECT id, class_id FROM tutors WHERE length(pin)<>4").all()) q('UPDATE tutors SET pin=? WHERE id=?').run(newPin(t.class_id), t.id); };
 // 5Г: классрук Власова О.А. сразу заведена с журналом
 if (!getSettingRaw('mig_5g_head')) {
   const c5 = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -882,11 +882,20 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/journal', (req, res, b, p, u, c) => {
   send(res, 200, marksRange(c, new URL(req.url, 'http://x').searchParams));
 }, T);
 // кабинет: учителя и журнал
-route('POST', '/klassruk/unlock', (req, res, b, p, u, c) => {
-  rate(req, 'kpin', 8, 15 * 60e3);
+// защита от подбора: 5 неверных попыток с адреса за 15 минут, 30 неверных на класс за час
+const pinFails = new Map();
+const recentFails = (k, ms) => (pinFails.get(k) || []).filter(t => Date.now() - t < ms);
+route('POST', '/uchitel/unlock', (req, res, b, p, u, c) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  const kIp = 'ip:' + c.id + ':' + ip, kCl = 'cl:' + c.id;
+  if (recentFails(kIp, 15 * 60e3).length >= 5) throw new HttpError(429, 'Слишком много неверных попыток. Попробуйте через 15 минут.');
+  if (recentFails(kCl, 60 * 60e3).length >= 30) throw new HttpError(429, 'Вход временно закрыт из-за попыток подбора. Попробуйте через час.');
   const pin = String(b.pin || '').replace(/\D/g, '');
-  const t = pin.length === 6 && q("SELECT token FROM tutors WHERE class_id=? AND head=1 AND pin=?").get(c.id, pin);
-  if (!t) throw new HttpError(403, 'Неверный ПИН. Его можно узнать у казначея класса.');
+  const t = pin.length === 4 && q('SELECT token FROM tutors WHERE class_id=? AND pin=?').get(c.id, pin);
+  if (!t) {
+    pinFails.set(kIp, [...recentFails(kIp, 15 * 60e3), Date.now()]); pinFails.set(kCl, [...recentFails(kCl, 60 * 60e3), Date.now()]);
+    throw new HttpError(403, 'Неверный ПИН. Его можно узнать у казначея класса.');
+  }
   send(res, 200, { token: t.token });
 }, T);
 route('GET', '/admin/tutors', (req, res, b, p, u, c) => send(res, 200, { tutors: q('SELECT id, name, subject, token, head, pin FROM tutors WHERE class_id=? ORDER BY head DESC, id').all(c.id) }), A);
@@ -897,8 +906,18 @@ route('POST', '/admin/tutors', (req, res, b, p, u, c) => {
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/tutors/:id', (req, res, b, p, u, c) => {
-  if (b.reissue) q("UPDATE tutors SET token=?, pin=CASE WHEN head=1 THEN ? ELSE '' END WHERE id=? AND class_id=?").run(newToken(), newPin(), int(p.id), c.id);
-  else q("UPDATE tutors SET name=?, subject=?, head=?, pin=CASE WHEN ? THEN pin ELSE '' END WHERE id=? AND class_id=?").run(str(b.name, 150) || 'Учитель', str(b.subject, 100), b.head ? 1 : 0, b.head ? 1 : 0, int(p.id), c.id);
+  // новый ПИН: старый вход на всех устройствах перестаёт работать (меняется и внутренний код)
+  if (b.reissue) q('UPDATE tutors SET token=?, pin=? WHERE id=? AND class_id=?').run(newToken(), newPin(c.id), int(p.id), c.id);
+  else {
+    let pin = String(b.pin ?? '').replace(/\D/g, '');
+    if (pin) {
+      if (pin.length !== 4) bad('ПИН - ровно 4 цифры');
+      if (q('SELECT 1 FROM tutors WHERE class_id=? AND pin=? AND id<>?').get(c.id, pin, int(p.id))) bad('Такой ПИН уже у другого учителя');
+      const old = q('SELECT pin FROM tutors WHERE id=? AND class_id=?').get(int(p.id), c.id);
+      if (old && old.pin !== pin) q('UPDATE tutors SET token=?, pin=? WHERE id=? AND class_id=?').run(newToken(), pin, int(p.id), c.id);
+    }
+    q('UPDATE tutors SET name=?, subject=?, head=? WHERE id=? AND class_id=?').run(str(b.name, 150) || 'Учитель', str(b.subject, 100), b.head ? 1 : 0, int(p.id), c.id);
+  }
   ensurePins();
   send(res, 200, { ok: true });
 }, W);
@@ -1006,16 +1025,17 @@ const server = http.createServer(async (req, res) => {
     if (mm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(mm[1]); if (!c) return fail(res, 404, 'Не найдено');
       const admin = url.searchParams.get('admin') === '1', teacher = url.searchParams.get('t') === '1';
-      if (teacher) return sendManifest(res, { name: 'Классрук: ' + c.title, short: c.title, start: `/c/${c.slug}/klassruk`, id: `/c/${c.slug}/klassruk` });
+      if (teacher) return sendManifest(res, { name: 'Учитель: ' + c.title, short: c.title, start: `/c/${c.slug}/uchitel`, id: `/c/${c.slug}/uchitel` });
       return sendManifest(res, { name: (admin ? 'Казначей: ' : 'Касса: ') + c.title, short: admin ? 'Казначей' : 'Касса класса', start: `/c/${c.slug}${admin ? '/admin' : ''}`, id: `/c/${c.slug}${admin ? '/admin' : ''}` });
     }
-    const um = /^\/c\/([a-z0-9-]+)\/uchitel\/?$/.exec(p);
-    if (um) { res.writeHead(301, { Location: `/c/${um[1]}/klassruk` }); return res.end(); }
-    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/klassruk|\/t\/[A-Za-z0-9]{8,20})?\/?$/.exec(p);
+    // страница классрука убрана: всё на общей странице учителя с ПИН-кодом
+    const um = /^\/c\/([a-z0-9-]+)\/klassruk\/?$/.exec(p);
+    if (um) { res.writeHead(301, { Location: `/c/${um[1]}/uchitel` }); return res.end(); }
+    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/uchitel|\/t\/[A-Za-z0-9]{8,20})?\/?$/.exec(p);
     if (cm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(cm[1]);
       if (!c) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><p style="font:18px system-ui;padding:24px">Класс не найден. Проверьте ссылку.</p><p style="font:16px system-ui;padding:0 24px"><a href="/">На главную</a></p>'); }
-      const isAdm = cm[2] === '/admin', isT = cm[2] === '/klassruk';
+      const isAdm = cm[2] === '/admin', isT = cm[2] === '/uchitel';
       const html = fs.readFileSync(path.join(PUBLIC_DIR, isAdm ? 'admin.html' : 'index.html'), 'utf8')
         .replace('<!--HEAD-->', cm[2]?.startsWith('/t/') ? '' : `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
         .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Казначей · ' + c.title : c.title)}</title>`);
