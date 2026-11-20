@@ -827,6 +827,63 @@ route('DELETE', '/admin/books/:id', (req, res, b, p, u, c) => {
   send(res, 200, { ok: true });
 }, A);
 
+// --- Учителя-предметники: личная ссылка и отметки «Сегодня на уроке» ---
+db.exec(`CREATE TABLE IF NOT EXISTS tutors (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '', token TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS marks (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  tutor_id INTEGER NOT NULL REFERENCES tutors(id) ON DELETE CASCADE, student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  date TEXT NOT NULL, mark TEXT NOT NULL DEFAULT 'good', ready INTEGER NOT NULL DEFAULT 1, comment TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(tutor_id, student_id, date))`);
+try { db.exec('ALTER TABLE tutors ADD COLUMN head INTEGER NOT NULL DEFAULT 0'); } catch {}
+const MARKS = ['good', 'star', 'note'];
+const newToken = () => crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
+const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у казначея класса.'); return t; };
+const T = { cls: true };
+route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
+  rate(req, 'tutor', 300, 60e3);
+  const t = tutorOf(c, p.tok), date = isDate(new URL(req.url, 'http://x').searchParams.get('date')) ? new URL(req.url, 'http://x').searchParams.get('date') : today();
+  send(res, 200, {
+    tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
+    students: q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id),
+    marks: q('SELECT student_id, mark, ready, comment FROM marks WHERE tutor_id=? AND date=?').all(t.id, date),
+  });
+}, T);
+route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
+  rate(req, 'tutor', 300, 60e3);
+  const t = tutorOf(c, p.tok), date = isDate(b.date) ? b.date : today();
+  const s = q('SELECT id FROM students WHERE id=? AND class_id=?').get(int(b.student_id), c.id); if (!s) bad('Ученик не найден');
+  const mark = MARKS.includes(b.mark) ? b.mark : 'good', ready = b.ready === false || b.ready === 0 ? 0 : 1, comment = str(b.comment, 300);
+  if (mark === 'good' && ready && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=?').run(t.id, s.id, date);
+  else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, mark, ready, comment) VALUES(?,?,?,?,?,?,?)
+    ON CONFLICT(tutor_id, student_id, date) DO UPDATE SET mark=excluded.mark, ready=excluded.ready, comment=excluded.comment, updated_at=datetime('now')`).run(c.id, t.id, s.id, date, mark, ready, comment);
+  send(res, 200, { ok: true });
+}, T);
+// классный руководитель по своей ссылке видит отметки всех учителей
+const marksRange = (c, sp) => {
+  const to = isDate(sp.get('to')) ? sp.get('to') : today(), from = isDate(sp.get('from')) ? sp.get('from') : to;
+  return { from, to, marks: q(`SELECT m.date, m.mark, m.ready, m.comment, m.student_id, t.name tutor, t.subject FROM marks m JOIN tutors t ON t.id=m.tutor_id
+    WHERE m.class_id=? AND m.date BETWEEN ? AND ? ORDER BY m.date DESC, t.subject, t.name`).all(c.id, from, to) };
+};
+route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/journal', (req, res, b, p, u, c) => {
+  rate(req, 'tutor', 300, 60e3);
+  const t = tutorOf(c, p.tok); if (!t.head) throw new HttpError(403, 'Журнал доступен только классному руководителю');
+  send(res, 200, marksRange(c, new URL(req.url, 'http://x').searchParams));
+}, T);
+// кабинет: учителя и журнал
+route('GET', '/admin/tutors', (req, res, b, p, u, c) => send(res, 200, { tutors: q('SELECT id, name, subject, token, head FROM tutors WHERE class_id=? ORDER BY head DESC, id').all(c.id) }), A);
+route('POST', '/admin/tutors', (req, res, b, p, u, c) => {
+  const name = str(b.name, 150); if (!name) bad('Введите имя учителя');
+  q('INSERT INTO tutors(class_id, name, subject, token, head) VALUES(?,?,?,?,?)').run(c.id, name, str(b.subject, 100), newToken(), b.head ? 1 : 0);
+  send(res, 200, { ok: true });
+}, W);
+route('PUT', '/admin/tutors/:id', (req, res, b, p, u, c) => {
+  if (b.reissue) q('UPDATE tutors SET token=? WHERE id=? AND class_id=?').run(newToken(), int(p.id), c.id);
+  else q('UPDATE tutors SET name=?, subject=?, head=? WHERE id=? AND class_id=?').run(str(b.name, 150) || 'Учитель', str(b.subject, 100), b.head ? 1 : 0, int(p.id), c.id);
+  send(res, 200, { ok: true });
+}, W);
+route('DELETE', '/admin/tutors/:id', (req, res, b, p, u, c) => { q('DELETE FROM tutors WHERE id=? AND class_id=?').run(int(p.id), c.id); send(res, 200, { ok: true }); }, A);
+route('GET', '/admin/marks', (req, res, b, p, u, c) => send(res, 200, marksRange(c, new URL(req.url, 'http://x').searchParams)), A);
+
 // --- Кабинет владельца сервиса ---
 const O = { auth: true, owner: true };
 route('GET', '/api/owner/classes', (req, res) => {
@@ -933,13 +990,13 @@ const server = http.createServer(async (req, res) => {
     }
     const um = /^\/c\/([a-z0-9-]+)\/uchitel\/?$/.exec(p);
     if (um) { res.writeHead(301, { Location: `/c/${um[1]}/klassruk` }); return res.end(); }
-    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/klassruk)?\/?$/.exec(p);
+    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/klassruk|\/t\/[A-Za-z0-9]{8,20})?\/?$/.exec(p);
     if (cm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(cm[1]);
       if (!c) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><p style="font:18px system-ui;padding:24px">Класс не найден. Проверьте ссылку.</p><p style="font:16px system-ui;padding:0 24px"><a href="/">На главную</a></p>'); }
       const isAdm = cm[2] === '/admin', isT = cm[2] === '/klassruk';
       const html = fs.readFileSync(path.join(PUBLIC_DIR, isAdm ? 'admin.html' : 'index.html'), 'utf8')
-        .replace('<!--HEAD-->', `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
+        .replace('<!--HEAD-->', cm[2]?.startsWith('/t/') ? '' : `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
         .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Казначей · ' + c.title : c.title)}</title>`);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end(html);

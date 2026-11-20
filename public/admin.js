@@ -40,6 +40,7 @@ async function load() {
     { id: 'класс', label: 'Список класса' },
     { id: 'инфо', label: 'Информация' },
     { id: 'учебники', label: 'Учебники' },
+    { id: 'уроки', label: 'На уроках' },
     { id: 'настройки', label: 'Настройки' },
   ], show);
 }
@@ -409,6 +410,43 @@ VIEWS['настройки'] = () => {
       h('p.hint', 'Та же страница, но без сборов, денег и чеков: только информация, учебники и список класса.'),
       h('div.row', h('input.grow', { value: classUrl() + '/klassruk', readonly: true, onclick: e => e.target.select() }),
         h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl() + '/klassruk'); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))));
+};
+
+// Учителя: личные ссылки для «Сегодня на уроке» + журнал отметок
+VIEWS['уроки'] = () => {
+  const box = h('div.stack');
+  const list = h('div.stack');
+  const copy = async t => { try { await navigator.clipboard.writeText(t); toast('Ссылка скопирована'); } catch { toast('Выделите и скопируйте'); } };
+  const draw = async () => {
+    let d; try { d = await api('GET', '/api/admin/tutors'); } catch (e) { list.replaceChildren(h('p', e.message)); return; }
+    list.replaceChildren(...(d.tutors.length ? d.tutors.map(t => {
+      const url = classUrl() + '/t/' + t.token;
+      const name = h('input', { value: t.name }), subj = h('input', { value: t.subject, placeholder: 'Предмет' });
+      const head = h('input', { type: 'checkbox', checked: !!t.head });
+      const save = () => api('PUT', '/api/admin/tutors/' + t.id, { name: name.value, subject: subj.value, head: head.checked }).then(() => { toast('Сохранено'); draw(); }, e => toast(e.message, true));
+      return h('div.tutor',
+        h('div.row.between', h('b', (t.head ? '⭐ ' : '') + t.name + (t.subject ? ' · ' + t.subject : '')), t.head ? h('span.pill.blue', 'видит журнал') : null),
+        h('div.row', h('input.grow.small', { value: url, readonly: true, onclick: e => e.target.select() }), h('button.btn.small', { onclick: () => copy(url) }, 'Копировать')),
+        h('details.more', h('summary', 'Изменить'),
+          h('div.form', { style: 'margin-top:8px' }, h('div.two', h('label.field', 'Имя', name), h('label.field', 'Предмет', subj)),
+            h('label.check', head, ' Классный руководитель (видит все отметки)'),
+            h('div.row', { style: 'gap:6px;flex-wrap:wrap' }, h('button.btn.primary.small', { onclick: save }, 'Сохранить'),
+              h('button.btn.small', { onclick: () => api('PUT', '/api/admin/tutors/' + t.id, { reissue: true }).then(() => { toast('Старая ссылка больше не работает'); draw(); }, e => toast(e.message, true)) }, 'Новая ссылка'),
+              h('button.btn.small.danger', { onclick: e => confirmInline(() => {}, `Удалить ${t.name} и все отметки этого учителя?`, () => api('DELETE', '/api/admin/tutors/' + t.id).then(draw, er => toast(er.message, true))) }, 'Удалить')))));
+    }) : [h('p.muted', 'Пока никого. Добавьте учителей - у каждого будет своя ссылка.')]));
+  };
+  const nm = h('input', { placeholder: 'Например, Иванова Анна Петровна', required: true }), sb = h('input', { placeholder: 'Например, Математика' }), hd = h('input', { type: 'checkbox' });
+  box.append(
+    h('section.card.form', h('h3', '👩‍🏫 Учителя и их ссылки'),
+      h('p.hint', 'У каждого учителя своя личная ссылка. По ней он видит «Информацию», «Учебники» и «Сегодня на уроке», где отмечает детей: у всех по умолчанию «Хорошо», можно поставить «Умница» или мягкое «Замечание» и готовность к уроку. Денег и сборов учитель не видит. Ссылку не выкладывайте в общий чат - отправьте учителю лично.'),
+      list,
+      h('form.form', { onsubmit: e => { e.preventDefault(); api('POST', '/api/admin/tutors', { name: nm.value, subject: sb.value, head: hd.checked }).then(() => { nm.value = sb.value = ''; hd.checked = false; toast('Учитель добавлен'); draw(); }, er => toast(er.message, true)); } },
+        h('h4', 'Добавить учителя'), h('div.two', h('label.field', 'ФИО', nm), h('label.field', 'Предмет', sb)),
+        h('label.check', hd, ' Классный руководитель (видит все отметки)'),
+        h('button.btn.primary', 'Добавить'))),
+    journalView('/api/admin/marks', S.students));
+  draw();
+  return box;
 };
 
 start();

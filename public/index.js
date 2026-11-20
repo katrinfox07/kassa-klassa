@@ -3,6 +3,9 @@
 let S = null;
 // версия для учителя: без сборов, денег и чеков
 const TEACHER = /\/klassruk\/?$/.test(location.pathname);
+// личная ссылка учителя-предметника: /c/<класс>/t/<код>
+const TUTOR = (/\/t\/([A-Za-z0-9]{8,20})\/?$/.exec(location.pathname) || [])[1] || null;
+let TU = null;
 
 async function load() {
   try { S = await api('GET', '/api/public'); }
@@ -11,6 +14,19 @@ async function load() {
   $('#title').textContent = S.class.title;
   $('#sub').textContent = '';
   $('#install').replaceChildren(installButton() || '');
+  if (TUTOR) {
+    try { TU = (await api('GET', `/api/t/${TUTOR}/day`)).tutor; }
+    catch (e) { $('#main').replaceChildren(h('p.empty', e.message)); $('#totals').hidden = true; return; }
+    $('#sub').textContent = TU.name + (TU.subject ? ' · ' + TU.subject : '');
+    $('#totals').replaceChildren(); $('#totals').hidden = true;
+    $('#install').replaceChildren();
+    return tabs($('#tabs'), [
+      { id: 'урок', label: 'Сегодня на уроке' },
+      ...(TU.head ? [{ id: 'журнал', label: 'Журнал' }] : []),
+      { id: 'инфо', label: 'Информация' },
+      ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
+    ], show);
+  }
   if (TEACHER) {
     $('#sub').textContent = 'Для классного руководителя';
     $('#totals').replaceChildren(); $('#totals').hidden = true;
@@ -35,6 +51,8 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
+  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`));
+  if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
   if (id === 'класс') m.replaceChildren(rosterView());
