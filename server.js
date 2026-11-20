@@ -835,6 +835,18 @@ CREATE TABLE IF NOT EXISTS marks (id INTEGER PRIMARY KEY, class_id INTEGER NOT N
   date TEXT NOT NULL, mark TEXT NOT NULL DEFAULT 'good', ready INTEGER NOT NULL DEFAULT 1, comment TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(tutor_id, student_id, date))`);
 try { db.exec('ALTER TABLE tutors ADD COLUMN head INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE tutors ADD COLUMN pin TEXT NOT NULL DEFAULT ''"); } catch {}
+const newPin = () => String(crypto.randomInt(100000, 1000000));
+// ПИН для классного руководителя: открывает отметки на странице /klassruk
+const ensurePins = () => { for (const t of q("SELECT id FROM tutors WHERE head=1 AND pin=''").all()) q('UPDATE tutors SET pin=? WHERE id=?').run(newPin(), t.id); };
+// 5Г: классрук Власова О.А. сразу заведена с журналом
+if (!getSettingRaw('mig_5g_head')) {
+  const c5 = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  if (c5 && !q('SELECT 1 FROM tutors WHERE class_id=? AND head=1').get(c5.id))
+    q('INSERT INTO tutors(class_id, name, subject, token, head) VALUES(?,?,?,?,1)').run(c5.id, 'Власова О.А.', 'Классный руководитель', crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x'));
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_head', '1')").run();
+}
+ensurePins();
 const MARKS = ['good', 'star', 'note'];
 const newToken = () => crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
 const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у казначея класса.'); return t; };
@@ -870,15 +882,24 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/journal', (req, res, b, p, u, c) => {
   send(res, 200, marksRange(c, new URL(req.url, 'http://x').searchParams));
 }, T);
 // кабинет: учителя и журнал
-route('GET', '/admin/tutors', (req, res, b, p, u, c) => send(res, 200, { tutors: q('SELECT id, name, subject, token, head FROM tutors WHERE class_id=? ORDER BY head DESC, id').all(c.id) }), A);
+route('POST', '/klassruk/unlock', (req, res, b, p, u, c) => {
+  rate(req, 'kpin', 8, 15 * 60e3);
+  const pin = String(b.pin || '').replace(/\D/g, '');
+  const t = pin.length === 6 && q("SELECT token FROM tutors WHERE class_id=? AND head=1 AND pin=?").get(c.id, pin);
+  if (!t) throw new HttpError(403, 'Неверный ПИН. Его можно узнать у казначея класса.');
+  send(res, 200, { token: t.token });
+}, T);
+route('GET', '/admin/tutors', (req, res, b, p, u, c) => send(res, 200, { tutors: q('SELECT id, name, subject, token, head, pin FROM tutors WHERE class_id=? ORDER BY head DESC, id').all(c.id) }), A);
 route('POST', '/admin/tutors', (req, res, b, p, u, c) => {
   const name = str(b.name, 150); if (!name) bad('Введите имя учителя');
   q('INSERT INTO tutors(class_id, name, subject, token, head) VALUES(?,?,?,?,?)').run(c.id, name, str(b.subject, 100), newToken(), b.head ? 1 : 0);
+  ensurePins();
   send(res, 200, { ok: true });
 }, W);
 route('PUT', '/admin/tutors/:id', (req, res, b, p, u, c) => {
-  if (b.reissue) q('UPDATE tutors SET token=? WHERE id=? AND class_id=?').run(newToken(), int(p.id), c.id);
-  else q('UPDATE tutors SET name=?, subject=?, head=? WHERE id=? AND class_id=?').run(str(b.name, 150) || 'Учитель', str(b.subject, 100), b.head ? 1 : 0, int(p.id), c.id);
+  if (b.reissue) q("UPDATE tutors SET token=?, pin=CASE WHEN head=1 THEN ? ELSE '' END WHERE id=? AND class_id=?").run(newToken(), newPin(), int(p.id), c.id);
+  else q("UPDATE tutors SET name=?, subject=?, head=?, pin=CASE WHEN ? THEN pin ELSE '' END WHERE id=? AND class_id=?").run(str(b.name, 150) || 'Учитель', str(b.subject, 100), b.head ? 1 : 0, b.head ? 1 : 0, int(p.id), c.id);
+  ensurePins();
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/tutors/:id', (req, res, b, p, u, c) => { q('DELETE FROM tutors WHERE id=? AND class_id=?').run(int(p.id), c.id); send(res, 200, { ok: true }); }, A);

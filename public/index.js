@@ -33,6 +33,8 @@ async function load() {
     return tabs($('#tabs'), [
       { id: 'инфо', label: 'Информация' },
       ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
+      { id: 'урок', label: 'Сегодня на уроке' },
+      { id: 'журнал', label: 'Журнал' },
       { id: 'класс', label: 'Список класса' },
     ], show);
   }
@@ -51,14 +53,33 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
-  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`));
-  if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));
+  if ((id === 'урок' || id === 'журнал') && TEACHER && !krToken()) return m.replaceChildren(pinView(() => show(id)));
+  const tok = TUTOR || krToken();
+  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${tok}`));
+  if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${tok}/journal`, S.students));
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
   if (id === 'класс') m.replaceChildren(rosterView());
   if (id === 'инфо') m.replaceChildren(renderInfo(S.info));
   if (id === 'учебники') m.replaceChildren(h('section.card', h('h3', '📚 Учебники'), h('p.small.muted', 'Нажмите на учебник, чтобы читать. Листайте вниз, кнопки «+» и «−» увеличивают страницу.'), booksGrid(S.books)));
 }
+
+// Классрук на /klassruk: отметки детей открываются ПИН-кодом (один раз на устройстве)
+const KR_KEY = 'kr-' + SLUG;
+function krToken() { try { return localStorage.getItem(KR_KEY) || TOKEN_MEM; } catch { return TOKEN_MEM; } }
+function pinView(done) {
+  const inp = h('input', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6 цифр', style: 'font-size:22px;letter-spacing:6px;text-align:center' });
+  const go = async e => {
+    e.preventDefault();
+    try { const r = await api('POST', '/api/klassruk/unlock', { pin: inp.value }); try { localStorage.setItem(KR_KEY, r.token); } catch {} ; TOKEN_MEM = r.token; done(); }
+    catch (er) { toast(er.message, true); }
+  };
+  return h('section.card.form', h('h3', '🔒 Отметки детей'),
+    h('p', 'Здесь «Сегодня на уроке» и журнал отметок от всех учителей. Чтобы их не увидели посторонние, введите ПИН классного руководителя. Это нужно один раз на этом телефоне.'),
+    h('form.form', { onsubmit: go }, inp, h('button.btn.primary', 'Открыть')),
+    h('p.hint', 'ПИН есть у казначея класса.'));
+}
+let TOKEN_MEM = null;
 
 function collectionsView() {
   const wrap = h('div.stack');

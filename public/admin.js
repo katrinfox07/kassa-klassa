@@ -427,11 +427,12 @@ VIEWS['уроки'] = () => {
       return h('div.tutor',
         h('div.row.between', h('b', (t.head ? '⭐ ' : '') + t.name + (t.subject ? ' · ' + t.subject : '')), t.head ? h('span.pill.blue', 'видит журнал') : null),
         h('div.row', h('input.grow.small', { value: url, readonly: true, onclick: e => e.target.select() }), h('button.btn.small', { onclick: () => copy(url) }, 'Копировать')),
+        t.head && t.pin ? h('p.small', 'ПИН для страницы классрука (' + classUrl().replace(/^https?:\/\//, '') + '/klassruk): ', h('b', { style: 'font-size:17px;letter-spacing:2px' }, t.pin), h('span.muted', ' - откроет там «Сегодня на уроке» и «Журнал». Скажите его классруку лично.')) : null,
         h('details.more', h('summary', 'Изменить'),
           h('div.form', { style: 'margin-top:8px' }, h('div.two', h('label.field', 'Имя', name), h('label.field', 'Предмет', subj)),
             h('label.check', head, ' Классный руководитель (видит все отметки)'),
             h('div.row', { style: 'gap:6px;flex-wrap:wrap' }, h('button.btn.primary.small', { onclick: save }, 'Сохранить'),
-              h('button.btn.small', { onclick: () => api('PUT', '/api/admin/tutors/' + t.id, { reissue: true }).then(() => { toast('Старая ссылка больше не работает'); draw(); }, e => toast(e.message, true)) }, 'Новая ссылка'),
+              h('button.btn.small', { onclick: () => api('PUT', '/api/admin/tutors/' + t.id, { reissue: true }).then(() => { toast('Старая ссылка и ПИН больше не работают'); draw(); }, e => toast(e.message, true)) }, t.head ? 'Новая ссылка и ПИН' : 'Новая ссылка'),
               h('button.btn.small.danger', { onclick: e => confirmInline(() => {}, `Удалить ${t.name} и все отметки этого учителя?`, () => api('DELETE', '/api/admin/tutors/' + t.id).then(draw, er => toast(er.message, true))) }, 'Удалить')))));
     }) : [h('p.muted', 'Пока никого. Добавьте учителей - у каждого будет своя ссылка.')]));
   };
