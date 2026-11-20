@@ -873,6 +873,7 @@ if (!/lesson/.test(q("SELECT sql FROM sqlite_master WHERE name='marks'").get().s
   INSERT INTO marks_new(id, class_id, tutor_id, student_id, date, mark, ready, comment, updated_at) SELECT id, class_id, tutor_id, student_id, date, mark, ready, comment, updated_at FROM marks;
   DROP TABLE marks; ALTER TABLE marks_new RENAME TO marks; COMMIT;`);
 }
+try { db.exec('ALTER TABLE marks ADD COLUMN help INTEGER NOT NULL DEFAULT 0'); } catch {}
 const MARKS = ['good', 'star', 'note'];
 const newToken = () => crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
 const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у администратора класса.'); return t; };
@@ -885,7 +886,7 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
     lesson, done: q('SELECT lesson, MAX(subject) subject FROM marks WHERE tutor_id=? AND date=? GROUP BY lesson').all(t.id, date),
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
     students: q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id),
-    marks: q('SELECT student_id, mark, ready, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),
+    marks: q('SELECT student_id, mark, ready, help, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),
   });
 }, T);
 route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
@@ -894,15 +895,16 @@ route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
   const s = q('SELECT id FROM students WHERE id=? AND class_id=?').get(int(b.student_id), c.id); if (!s) bad('Ученик не найден');
   const mark = MARKS.includes(b.mark) ? b.mark : 'good', ready = b.ready === false || b.ready === 0 ? 0 : 1, comment = str(b.comment, 300);
   const lesson = Math.max(0, Math.min(12, int(b.lesson) || 0)), subject = str(b.subject, 100);
-  if (mark === 'good' && ready && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=? AND lesson=?').run(t.id, s.id, date, lesson);
-  else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, lesson, subject, mark, ready, comment) VALUES(?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(tutor_id, student_id, date, lesson) DO UPDATE SET subject=excluded.subject, mark=excluded.mark, ready=excluded.ready, comment=excluded.comment, updated_at=datetime('now')`).run(c.id, t.id, s.id, date, lesson, subject, mark, ready, comment);
+  const help = b.help ? 1 : 0;
+  if (mark === 'good' && ready && !help && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=? AND lesson=?').run(t.id, s.id, date, lesson);
+  else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, lesson, subject, mark, ready, help, comment) VALUES(?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(tutor_id, student_id, date, lesson) DO UPDATE SET subject=excluded.subject, mark=excluded.mark, ready=excluded.ready, help=excluded.help, comment=excluded.comment, updated_at=datetime('now')`).run(c.id, t.id, s.id, date, lesson, subject, mark, ready, help, comment);
   send(res, 200, { ok: true });
 }, T);
 // классный руководитель по своей ссылке видит отметки всех учителей
 const marksRange = (c, sp) => {
   const to = isDate(sp.get('to')) ? sp.get('to') : today(), from = isDate(sp.get('from')) ? sp.get('from') : to;
-  return { from, to, marks: q(`SELECT m.date, m.lesson, m.mark, m.ready, m.comment, m.student_id, t.name tutor, COALESCE(NULLIF(m.subject, ''), t.subject) subject FROM marks m JOIN tutors t ON t.id=m.tutor_id
+  return { from, to, marks: q(`SELECT m.date, m.lesson, m.mark, m.ready, m.help, m.comment, m.student_id, t.name tutor, COALESCE(NULLIF(m.subject, ''), t.subject) subject FROM marks m JOIN tutors t ON t.id=m.tutor_id
     WHERE m.class_id=? AND m.date BETWEEN ? AND ? ORDER BY m.date DESC, m.lesson, t.name`).all(c.id, from, to) };
 };
 route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/journal', (req, res, b, p, u, c) => {
@@ -951,6 +953,126 @@ route('PUT', '/admin/tutors/:id', (req, res, b, p, u, c) => {
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/tutors/:id', (req, res, b, p, u, c) => { q('DELETE FROM tutors WHERE id=? AND class_id=?').run(int(p.id), c.id); send(res, 200, { ok: true }); }, A);
+// ---------- Звёзды и «Экспедиция» класса ----------
+// Без рейтингов: личное (звёзды, звание, значки) видят только классрук и администратор, на общей карте - ни имён, ни вкладов.
+db.exec(`CREATE TABLE IF NOT EXISTS stars (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE, amount INTEGER NOT NULL, kind TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+  peer_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+const STAR_DEFAULTS = {
+  rewards: [
+    { price: 5, title: 'Выбрать место на день (у окна или с другом)' },
+    { price: 8, title: 'Помощник учителя на уроке' },
+    { price: 10, title: 'Пропустить одно дежурство (по согласию классрука)' },
+    { price: 15, title: 'Второй шанс на проверочную (по согласию учителя)' },
+    { price: 20, title: '+1 балл к оценке (по согласию учителя)' },
+  ],
+  map: [
+    { steps: 100, icon: '🌳', title: 'Урок на улице' },
+    { steps: 250, icon: '🎲', title: 'Игра на классном часе' },
+    { steps: 500, icon: '🍕', title: 'Пицца всем классом' },
+    { steps: 800, icon: '🎬', title: 'Кино в классе' },
+    { steps: 1200, icon: '🏕', title: 'Поход всем классом' },
+  ],
+};
+const RANKS = [[0, 'Новичок', '🌱'], [10, 'Искатель', '🧭'], [30, 'Мастер', '🛡'], [60, 'Легенда', '👑']];
+const weekStart = d => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() - (x.getUTCDay() + 6) % 7); return x.toISOString().slice(0, 10); };
+const dayShift = (d, n) => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+function starsState(c, full) {
+  const set = getSetting(c.id, 'stars', {});
+  const rewards = set.rewards || STAR_DEFAULTS.rewards, map = set.map || STAR_DEFAULTS.map;
+  const kids = q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id);
+  const marks = q('SELECT student_id, date, mark, ready, help FROM marks WHERE class_id=? ORDER BY date').all(c.id);
+  const tx = q('SELECT * FROM stars WHERE class_id=? ORDER BY id').all(c.id);
+  const P = Object.fromEntries(kids.map(k => [k.id, { earned: 0, balance: 0, helps: 0, readyWeeks: 0, gave: 0 }]));
+  const day = {}; // дата -> шаги класса и признаки
+  const D = d => day[d] ||= { steps: 0, notes: 0, any: 0 };
+  let classSteps = 0;
+  const lastNote = {};
+  for (const m of marks) {
+    const x = P[m.student_id], dd = D(m.date); dd.any++;
+    if (m.mark === 'note') { dd.notes++; lastNote[m.student_id] = m.date; }
+    if (!x) continue;
+    if (m.mark === 'star') {
+      x.earned++; dd.steps++;
+      if (lastNote[m.student_id] && lastNote[m.student_id] < m.date && lastNote[m.student_id] >= dayShift(m.date, -14)) { dd.steps++; delete lastNote[m.student_id]; } // вернулся в строй
+    }
+    if (m.help) { x.earned += 3; x.helps++; dd.steps += 5; }
+  }
+  // тихий день: в классе были отметки и ни одного замечания
+  for (const [d, v] of Object.entries(day)) if (v.any && !v.notes) v.steps += 5, v.quiet = true;
+  // завершённые недели: «чистая неделя» (+20 классу) и личная «неделя готовности» (+2)
+  const weeks = {};
+  for (const m of marks) { const w = weeks[weekStart(m.date)] ||= { dates: new Set(), notes: 0, notReady: new Set() }; w.dates.add(m.date); if (m.mark === 'note') w.notes++; if (!m.ready) w.notReady.add(m.student_id); }
+  const thisWeek = weekStart(today());
+  const weekBonus = [];
+  for (const [w, v] of Object.entries(weeks)) {
+    if (w >= thisWeek || v.dates.size < 3) continue;
+    const end = dayShift(w, 6); let steps = 0;
+    if (!v.notes) steps += 20;
+    for (const k of kids) if (!v.notReady.has(k.id)) { P[k.id].earned += 2; P[k.id].readyWeeks++; steps += 2; }
+    D(end).steps += steps; if (!v.notes) D(end).cleanWeek = true;
+  }
+  for (const k of kids) P[k.id].balance = P[k.id].earned;
+  for (const t of tx) {
+    const x = P[t.student_id]; if (!x) continue;
+    x.balance += t.amount;
+    if (t.kind === 'award') { x.earned += t.amount; D(t.created_at.slice(0, 10)).steps += t.amount; }
+    if (t.kind === 'gift' && t.amount < 0) x.gave -= t.amount;
+  }
+  classSteps = Object.values(day).reduce((a, v) => a + v.steps, 0);
+  const days = Object.entries(day).filter(([, v]) => v.steps).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10)
+    .map(([date, v]) => ({ date, steps: v.steps, quiet: !!v.quiet, cleanWeek: !!v.cleanWeek }));
+  const out = { steps: classSteps, map, days, rewards };
+  if (!full) return out;
+  const nm = Object.fromEntries(kids.map(k => [k.id, k.name]));
+  out.kids = kids.map(k => {
+    const x = P[k.id], r = [...RANKS].reverse().find(r => x.earned >= r[0]);
+    const next = RANKS.find(r => r[0] > x.earned);
+    return { id: k.id, name: k.name, balance: x.balance, earned: x.earned, rank: r[1], rankIcon: r[2], next: next ? { title: next[1], need: next[0] - x.earned } : null,
+      badges: [x.helps >= 3 && '🤝 Помощник', x.readyWeeks >= 1 && '🎒 Неделя без забытых тетрадей', x.gave >= 3 && '💛 Щедрая душа'].filter(Boolean) };
+  });
+  out.log = tx.slice(-30).reverse().map(t => ({ id: t.id, date: t.created_at.slice(0, 10), name: nm[t.student_id] || '-', peer: nm[t.peer_id] || '', amount: t.amount, kind: t.kind, note: t.note }));
+  return out;
+}
+function starsAction(c, b) {
+  const kid = id => q('SELECT id FROM students WHERE id=? AND class_id=? AND active=1').get(int(id), c.id) || bad('Ученик не найден');
+  const st = starsState(c, true), bal = id => st.kids.find(k => k.id === id)?.balance || 0;
+  const s = b.action === 'undo' ? null : kid(b.student_id), note = str(b.note, 200);
+  if (b.action === 'award') {
+    const n = int(b.amount); if (!(n >= 1 && n <= 10)) bad('Можно начислить от 1 до 10 звёзд');
+    q("INSERT INTO stars(class_id, student_id, amount, kind, note) VALUES(?,?,?,'award',?)").run(c.id, s.id, n, note || 'За поступок');
+  } else if (b.action === 'spend') {
+    const r = st.rewards[int(b.reward)]; if (!r) bad('Выберите награду');
+    if (bal(s.id) < r.price) bad('Пока не хватает звёзд');
+    q("INSERT INTO stars(class_id, student_id, amount, kind, note) VALUES(?,?,?,'spend',?)").run(c.id, s.id, -r.price, r.title);
+  } else if (b.action === 'gift') {
+    const to = kid(b.to_id), n = int(b.amount); if (to.id === s.id) bad('Выберите другого ученика');
+    if (!(n >= 1)) bad('Сколько звёзд подарить?'); if (bal(s.id) < n) bad('Пока не хватает звёзд');
+    q("INSERT INTO stars(class_id, student_id, amount, kind, note, peer_id) VALUES(?,?,?,'gift',?,?)").run(c.id, s.id, -n, note, to.id);
+    q("INSERT INTO stars(class_id, student_id, amount, kind, note, peer_id) VALUES(?,?,?,'gift',?,?)").run(c.id, to.id, n, note, s.id);
+  } else if (b.action === 'undo') {
+    const t = q('SELECT * FROM stars WHERE id=? AND class_id=?').get(int(b.id), c.id) || bad('Запись не найдена');
+    q('DELETE FROM stars WHERE id=?').run(t.id);
+    if (t.kind === 'gift') q("DELETE FROM stars WHERE class_id=? AND kind='gift' AND student_id=? AND peer_id=? AND amount=? AND created_at=?").run(c.id, t.peer_id, t.student_id, -t.amount, t.created_at);
+  } else bad('Неизвестное действие');
+}
+route('GET', '/expedition', (req, res, b, p, u, c) => send(res, 200, starsState(c, false)), { cls: true });
+route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/stars', (req, res, b, p, u, c) => {
+  rate(req, 'tutor', 300, 60e3); const t = tutorOf(c, p.tok);
+  send(res, 200, starsState(c, !!t.head));
+}, T);
+route('POST', '/t/(?<tok>[A-Za-z0-9]{8,20})/stars', (req, res, b, p, u, c) => {
+  rate(req, 'tutor', 300, 60e3); const t = tutorOf(c, p.tok); if (!t.head) throw new HttpError(403, 'Доступно классному руководителю');
+  starsAction(c, b); send(res, 200, starsState(c, true));
+}, T);
+route('GET', '/admin/stars', (req, res, b, p, u, c) => send(res, 200, starsState(c, true)), A);
+route('POST', '/admin/stars', (req, res, b, p, u, c) => { starsAction(c, b); send(res, 200, starsState(c, true)); }, W);
+route('PUT', '/admin/stars-settings', (req, res, b, p, u, c) => {
+  const rewards = (Array.isArray(b.rewards) ? b.rewards : []).slice(0, 30).map(r => ({ price: Math.max(1, Math.min(999, int(r.price) || 1)), title: str(r.title, 120) })).filter(r => r.title);
+  const map = (Array.isArray(b.map) ? b.map : []).slice(0, 20).map(r => ({ steps: Math.max(1, Math.min(99999, int(r.steps) || 1)), icon: str(r.icon, 8) || '⭐', title: str(r.title, 120) })).filter(r => r.title).sort((a, b) => a.steps - b.steps);
+  setSetting(c.id, 'stars', { rewards: rewards.length ? rewards : STAR_DEFAULTS.rewards, map: map.length ? map : STAR_DEFAULTS.map });
+  send(res, 200, starsState(c, true));
+}, W);
 route('GET', '/admin/marks', (req, res, b, p, u, c) => send(res, 200, marksRange(c, new URL(req.url, 'http://x').searchParams)), A);
 
 // --- Кабинет владельца сервиса ---

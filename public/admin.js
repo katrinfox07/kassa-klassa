@@ -41,6 +41,7 @@ async function load() {
     { id: 'инфо', label: 'Информация' },
     { id: 'учебники', label: 'Учебники' },
     { id: 'уроки', label: 'На уроках' },
+    { id: 'звёзды', label: 'Звёзды' },
     { id: 'настройки', label: 'Настройки' },
   ], show);
 }
@@ -430,26 +431,38 @@ VIEWS['уроки'] = () => {
         h('details.more', h('summary', 'Изменить'),
           h('div.form', { style: 'margin-top:8px' }, h('div.two', h('label.field', 'Имя', name), h('label.field', 'Предмет', subj)),
             h('label.field', 'ПИН-код (4 цифры, свой у каждого)', pin),
-            h('label.check', head, ' Классный руководитель (видит все отметки)'),
             h('div.row', { style: 'gap:6px;flex-wrap:wrap' }, h('button.btn.primary.small', { onclick: save }, 'Сохранить'),
               h('button.btn.small', { onclick: () => api('PUT', '/api/admin/tutors/' + t.id, { reissue: true }).then(() => { toast('Новый ПИН готов, старый больше не работает'); draw(); }, e => toast(e.message, true)) }, 'Новый ПИН'),
               h('button.btn.small.danger', { onclick: e => confirmInline(() => {}, `Удалить ${t.name} и все отметки этого учителя?`, () => api('DELETE', '/api/admin/tutors/' + t.id).then(draw, er => toast(er.message, true))) }, 'Удалить')))));
     }) : [h('p.muted', 'Пока никого. Добавьте учителей - каждому сайт выдаст свой ПИН-код.')]));
   };
-  const nm = h('input', { placeholder: 'Например, Иванова Анна Петровна', required: true }), sb = h('input', { placeholder: 'Например, Математика' }), hd = h('input', { type: 'checkbox' });
+  const nm = h('input', { placeholder: 'Например, Иванова Анна Петровна', required: true }), sb = h('input', { placeholder: 'Например, Математика' });
   box.append(
     h('section.card.form', h('h3', '👩‍🏫 Учителя и ПИН-коды'),
       h('p.hint', 'Для всех учителей одна страница. Учитель открывает её, вводит свой ПИН из 4 цифр и видит «Сегодня на уроке», «Информацию» и «Учебники». На уроке у всех детей по умолчанию «Хорошо», можно поставить «Умница» или мягкое «Замечание» и готовность к уроку. Классный руководитель по своему ПИНу видит ещё «Журнал» со всеми отметками и «Список класса». Денег и сборов учителя не видят. ПИН сообщайте каждому учителю лично.'),
       h('div.row', h('input.grow.small', { value: classUrl() + '/uchitel', readonly: true, onclick: e => e.target.select() }), h('button.btn.small', { onclick: () => copy(classUrl() + '/uchitel') }, 'Копировать')),
       list,
-      h('form.form', { onsubmit: e => { e.preventDefault(); api('POST', '/api/admin/tutors', { name: nm.value, subject: sb.value, head: hd.checked }).then(() => { nm.value = sb.value = ''; hd.checked = false; toast('Учитель добавлен'); draw(); }, er => toast(er.message, true)); } },
+      h('form.form', { onsubmit: e => { e.preventDefault(); api('POST', '/api/admin/tutors', { name: nm.value, subject: sb.value, head: false }).then(() => { nm.value = sb.value = ''; toast('Учитель добавлен'); draw(); }, er => toast(er.message, true)); } },
         h('h4', 'Добавить учителя'), h('div.two', h('label.field', 'ФИО', nm), h('label.field', 'Предмет', sb)),
-        h('label.check', hd, ' Классный руководитель (видит все отметки)'),
         h('button.btn.primary', 'Добавить'))),
     journalView('/api/admin/marks', S.students));
   draw();
   return box;
 };
+
+// Звёзды детей + настройки наград и привалов карты
+VIEWS['звёзды'] = () => starsView('/api/admin/stars', { settings: (D, done) => {
+  const rw = h('textarea', { rows: 6 }, D.rewards.map(r => `${r.price} - ${r.title}`).join('\n'));
+  const mp = h('textarea', { rows: 6 }, D.map.map(r => `${r.steps} - ${r.icon} - ${r.title}`).join('\n'));
+  const parse = (t, f) => t.value.split('\n').map(l => l.split(/\s+-\s+/)).filter(a => a.length >= 2).map(f);
+  return h('section.card.form', h('h3', '⚙️ Награды и привалы'),
+    h('label.field', 'Награды за звёзды (строка: цена - название)', rw),
+    h('label.field', 'Привалы общей карты (строка: шаги - значок - приз для всего класса)', mp),
+    h('button.btn.primary', { onclick: async () => {
+      try { done(await api('PUT', '/api/admin/stars-settings', { rewards: parse(rw, a => ({ price: a[0], title: a.slice(1).join(' - ') })), map: parse(mp, a => a.length >= 3 ? { steps: a[0], icon: a[1], title: a.slice(2).join(' - ') } : { steps: a[0], icon: '⭐', title: a[1] }) })); toast('Сохранено'); }
+      catch (e) { toast(e.message, true); }
+    } }, 'Сохранить'));
+} });
 
 start();
 

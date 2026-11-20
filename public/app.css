@@ -748,3 +748,25 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .lown[hidden] { display: none; }
 .lown select, .lown input { height: 36px; min-height: 0; padding: 4px 8px; font-size: 14px; }
 .lchip.lother { background: transparent; border: 1.5px dashed var(--line); box-shadow: none; min-width: 80px; }
+.lhelp { border: 0; font: inherit; font-size: 16px; width: 34px; height: 32px; border-radius: 8px; background: var(--bg); cursor: pointer; opacity: .4; filter: grayscale(.7); }
+.lhelp.on { opacity: 1; filter: none; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.lmain { grid-template-columns: 1fr auto auto auto auto; }
+@media (max-width: 400px) { .lbtn { width: 30px; } .lready, .lpen, .lhelp { width: 28px; } .lname { font-size: 13px; } }
+/* Экспедиция */
+.expd { display: grid; gap: 8px; }
+.ex-big { font-size: 15px; color: var(--muted); } .ex-big b { font-size: 34px; color: var(--text); margin-right: 4px; }
+.ex-next { font-weight: 700; margin: 0; }
+.ex-track { position: relative; height: 14px; border-radius: 999px; background: var(--bg); margin: 18px 6px 14px; }
+.ex-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--grad); transition: width 1s ease; }
+.ex-pt { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 22px; filter: grayscale(1); opacity: .55; }
+.ex-pt.got { filter: none; opacity: 1; }
+.ex-stops { display: grid; gap: 4px; } .ex-stops li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--bg); }
+.ex-stops li.got { background: var(--ok-soft); } .ex-ic { font-size: 20px; }
+.ex-days li { padding: 3px 0; font-size: 14px; }
+/* Звёзды */
+.st-list { display: grid; gap: 0; }
+.st-kid { display: flex; align-items: center; gap: 8px; border: 0; border-bottom: 1px solid var(--line); background: none; font: inherit; color: var(--text); padding: 8px 4px; text-align: left; cursor: pointer; }
+.st-kid:last-child { border-bottom: 0; }
+.st-bal { font-weight: 800; white-space: nowrap; }
+.st-badges { margin-left: 6px; }
+.st-log li { padding: 4px 0; font-size: 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }

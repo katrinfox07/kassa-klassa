@@ -31,7 +31,7 @@ async function load() {
     else $('#install').replaceChildren();
     return tabs($('#tabs'), [
       { id: 'урок', label: 'Сегодня на уроке' },
-      ...(TU.head ? [{ id: 'журнал', label: 'Журнал' }] : []),
+      ...(TU.head ? [{ id: 'журнал', label: 'Журнал' }, { id: 'звёзды', label: 'Звёзды ⭐' }] : [{ id: 'экспедиция', label: 'Экспедиция' }]),
       { id: 'инфо', label: 'Информация' },
       ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
       ...(TU.head ? [{ id: 'класс', label: 'Список класса' }] : []),
@@ -44,6 +44,7 @@ async function load() {
   tabs($('#tabs'), [
     { id: 'сборы', label: 'Сборы' },
     { id: 'инфо', label: 'Информация' },
+    { id: 'экспедиция', label: 'Экспедиция' },
     ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
     { id: 'класс', label: 'Список класса' },
     { id: 'расходы', label: 'Расходы и чеки' },
@@ -53,6 +54,8 @@ async function load() {
 function show(id) {
   const m = $('#main');
   if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`, { info: S.info, subject: TU?.subject }));
+  if (id === 'звёзды') m.replaceChildren(starsView(`/api/t/${TUTOR}/stars`));
+  if (id === 'экспедиция') { m.replaceChildren(h('section.card', h('p.muted', 'Загружаем…'))); api('GET', TUTOR ? `/api/t/${TUTOR}/stars` : '/api/expedition').then(d => m.replaceChildren(expeditionView(d)), e => m.replaceChildren(h('p.empty', e.message))); }
   if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());

@@ -635,13 +635,13 @@ function lessonView(tok, opts = {}) {
     const updStat = () => { const v = Object.values(byId); stat.textContent = `⭐ ${v.filter(m => m.mark === 'star').length} · 💬 ${v.filter(m => m.mark === 'note').length} · не готовы ${v.filter(m => m.ready === 0).length}`; };
     updStat();
     const rows = d.students.map(s => {
-      const m = byId[s.id] || { mark: 'good', ready: 1, comment: '' };
+      const m = byId[s.id] || { mark: 'good', ready: 1, help: 0, comment: '' };
       const saved = h('span.lsv');
       let timer = null;
       const save = () => {
         clearTimeout(timer);
         timer = setTimeout(async () => {
-          try { await api('PUT', `${tok}/mark`, { date, lesson: lesson.n, subject: lesson.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
+          try { await api('PUT', `${tok}/mark`, { date, lesson: lesson.n, subject: lesson.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, help: !!m.help, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
           catch (e) { toast(e.message, true); }
         }, 400);
       };
@@ -657,9 +657,10 @@ function lessonView(tok, opts = {}) {
         m.mark = k; seg.querySelectorAll('.lbtn').forEach(b => b.classList.toggle('on', b === e.currentTarget)); row.dataset.mark = k; drawChips(); save();
       } }, v.icon)));
       let forceOpen = false;
+      const helpB = h('button.lhelp' + (m.help ? '.on' : ''), { type: 'button', title: 'Помог(ла) однокласснику', 'aria-label': 'Помог(ла) однокласснику', onclick: () => { m.help = m.help ? 0 : 1; helpB.classList.toggle('on', !!m.help); save(); } }, '🤝');
       const ready = h('button.lready' + (m.ready ? '' : '.off'), { type: 'button', title: 'Готовность к уроку', 'aria-label': 'Не готов(а) к уроку', onclick: () => { m.ready = m.ready ? 0 : 1; ready.classList.toggle('off', !m.ready); drawChips(); save(); } }, '🎒');
       const pen = h('button.lpen', { type: 'button', title: 'Комментарий', 'aria-label': 'Комментарий', onclick: () => { forceOpen = !forceOpen || !!m.comment; drawChips(); if (row.classList.contains('open')) comment.focus(); } }, '✎');
-      const row = h('div.lrow', { 'data-mark': m.mark }, h('div.lmain', h('span.lname', s.name, saved), seg, ready, pen), h('div.lextra', comment, chips));
+      const row = h('div.lrow', { 'data-mark': m.mark }, h('div.lmain', h('span.lname', s.name, saved), seg, helpB, ready, pen), h('div.lextra', comment, chips));
       drawChips();
       return row;
     });
@@ -670,7 +671,7 @@ function lessonView(tok, opts = {}) {
           h('button.lchip.lother', { type: 'button', onclick: () => { own.hidden = !own.hidden; if (!own.hidden) { subjIn.value = lesson.subject || ''; subjIn.focus(); } } }, h('b', 'Другой'), h('span', '✎ урок'))) : null,
         list.length ? null : h('p.small.muted', 'В этот день уроков по расписанию нет. Выберите урок сами.'),
         own,
-        h('div.llegend', h('span', '🙂 хорошо (у всех сразу)'), h('span', '⭐ умница'), h('span', '💬 замечание'), h('span', '🎒 не готов(а)'), h('span', '✎ комментарий')),
+        h('div.llegend', h('span', '🙂 хорошо (у всех сразу)'), h('span', '⭐ умница'), h('span', '💬 замечание'), h('span', '🤝 помог(ла) однокласснику'), h('span', '🎒 не готов(а)'), h('span', '✎ комментарий')),
         h('div.row.between.small', h('span.muted', 'Сохраняется само'), stat)),
       h('section.card.lessons-list', rows));
   };
@@ -701,5 +702,61 @@ function journalView(fetchUrl, students) {
       })) : h('p.muted', 'За этот период особых отметок нет.')));
   };
   load();
+  return box;
+}
+
+// ---------- Экспедиция класса: общая карта (без имён и сравнений) ----------
+function expeditionView(d) {
+  const map = d.map || [], steps = d.steps || 0, max = map.length ? map[map.length - 1].steps : 100;
+  const next = map.find(x => x.steps > steps), got = map.filter(x => x.steps <= steps);
+  const fd = s => s.split('-').reverse().slice(0, 2).join('.');
+  const pct = Math.min(100, steps / max * 100);
+  return h('section.card.expd',
+    h('h3', '🗺 Экспедиция класса'),
+    h('p.small.muted', 'Общий путь всего класса. Каждая звезда любого ученика, каждый тихий день без замечаний и каждая помощь другу двигают вперёд весь класс.'),
+    h('div.ex-big', h('b', steps), ' шагов пройдено'),
+    next ? h('p.ex-next', `До привала «${next.title}» ${next.icon} осталось ${next.steps - steps} шагов`) : h('p.ex-next', '🏆 Весь маршрут пройден! Ура!'),
+    h('div.ex-track', h('div.ex-fill', { style: `width:${pct}%` }), map.map(x => h('span.ex-pt' + (x.steps <= steps ? '.got' : ''), { style: `left:${Math.min(100, x.steps / max * 100)}%`, title: x.title }, x.icon))),
+    h('ul.plain.ex-stops', map.map(x => h('li' + (x.steps <= steps ? '.got' : ''), h('span.ex-ic', x.icon), h('span.grow', x.title), h('span.small.muted', x.steps <= steps ? 'получено ✓' : x.steps + ' шагов')))),
+    d.days?.length ? h('details.more', h('summary', 'Последние дни'), h('ul.plain.ex-days', d.days.map(x => h('li', h('span.muted', fd(x.date)), ' +' + x.steps + ' шагов', x.quiet ? ' · 🌤 тихий день' : '', x.cleanWeek ? ' · ✨ чистая неделя' : '')))) : null,
+    h('p.hint', 'Как идти быстрее: стараться на уроках ⭐, помогать друг другу 🤝, приходить готовыми 🎒. Замечания шаги не отнимают.'));
+}
+// ---------- Звёзды детей: только для классрука и администратора ----------
+function starsView(base, opts = {}) {
+  const box = h('div.stack');
+  let D = null;
+  const draw = () => {
+    const kidsBox = h('div.st-list', D.kids.map(k => h('button.st-kid', { type: 'button', onclick: () => kidDialog(k) },
+      h('span.grow', h('b', k.name), h('span.small.muted', ` ${k.rankIcon} ${k.rank}`), k.badges.length ? h('span.st-badges', k.badges.map(x => x.split(' ')[0]).join(' ')) : null),
+      h('span.st-bal', '⭐ ' + k.balance))));
+    box.replaceChildren(
+      expeditionView(D),
+      h('section.card', h('h3', '⭐ Звёзды учеников'),
+        h('p.small.muted', 'Видите только вы. Детям не показываем ни рейтингов, ни сравнений. Ребёнку можно сказать его звёзды лично. Нажмите на имя, чтобы начислить, обменять или подарить.'),
+        h('p.small.muted', 'Звёзды: «Умница» +1, «Помог(ла) однокласснику» +3, неделя без «Не готов(а)» +2. Звания только растут: 🌱 Новичок, 🧭 Искатель (10), 🛡 Мастер (30), 👑 Легенда (60).'),
+        kidsBox),
+      D.log.length ? h('section.card', h('h3', 'История'), h('ul.plain.st-log', D.log.map(t => h('li',
+        h('span.muted.small', t.date.split('-').reverse().slice(0, 2).join('.') + ' '),
+        h('span', t.kind === 'award' ? `${t.name}: +${t.amount} ⭐ ${t.note}` : t.kind === 'spend' ? `${t.name}: обмен на «${t.note}» (${-t.amount} ⭐)` : t.amount < 0 ? `${t.name} подарил(а) ${-t.amount} ⭐ ${t.peer}` : `${t.name} получил(а) ${t.amount} ⭐ от ${t.peer}`),
+        t.kind === 'gift' && t.amount > 0 ? null : h('button.linklike.small', { onclick: () => act({ action: 'undo', id: t.id, student_id: 0 }) }, 'отменить'))))) : null,
+      opts.settings ? opts.settings(D, set => { D = set; draw(); }) : null);
+  };
+  const act = async body => { try { D = await api('POST', base, body); draw(); toast('Готово'); return true; } catch (e) { toast(e.message, true); return false; } };
+  function kidDialog(k) {
+    const amt = h('input', { type: 'number', min: 1, max: 10, value: 1 }), note = h('input', { placeholder: 'За что (например, помог на дежурстве)' });
+    const rew = h('select', D.rewards.map((r, i) => h('option', { value: i, disabled: r.price > k.balance }, `${r.price} ⭐ - ${r.title}`)));
+    const to = h('select', D.kids.filter(x => x.id !== k.id).map(x => h('option', { value: x.id }, x.name))), gamt = h('input', { type: 'number', min: 1, max: Math.max(1, k.balance), value: 1 });
+    const close = modal(k.name, h('div.form',
+      h('p', `Звёзд сейчас: `, h('b', '⭐ ' + k.balance), ` · звание ${k.rankIcon} ${k.rank}` + (k.next ? ` (до «${k.next.title}» ещё ${k.next.need})` : '')),
+      k.badges.length ? h('p.small', 'Значки: ' + k.badges.join(', ')) : null,
+      h('h4', '➕ Начислить за поступок'), h('div.two', h('label.field', 'Звёзд', amt), h('label.field', 'За что', note)),
+      h('button.btn.primary', { onclick: async () => { if (await act({ action: 'award', student_id: k.id, amount: amt.value, note: note.value })) close(); } }, 'Начислить'),
+      h('h4', '🎁 Обменять на награду'), h('label.field', 'Награда', rew),
+      h('button.btn', { disabled: !D.rewards.some(r => r.price <= k.balance), onclick: async () => { if (await act({ action: 'spend', student_id: k.id, reward: rew.value })) close(); } }, 'Обменять'),
+      h('h4', '💛 Подарить однокласснику'), h('div.two', h('label.field', 'Кому', to), h('label.field', 'Сколько', gamt)),
+      h('button.btn', { disabled: k.balance < 1, onclick: async () => { if (await act({ action: 'gift', student_id: k.id, to_id: to.value, amount: gamt.value })) close(); } }, 'Подарить')));
+  }
+  box.append(h('section.card', h('p.muted', 'Загружаем…')));
+  api('GET', base).then(d => { D = d; draw(); }, e => box.replaceChildren(h('section.card', h('p', e.message))));
   return box;
 }
