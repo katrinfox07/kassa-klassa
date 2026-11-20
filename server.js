@@ -187,6 +187,18 @@ if (!getSettingRaw('mig_5g_lunch')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_lunch', '1')").run();
 }
+// 5Г: телефон классного руководителя (со слов казначея)
+if (!getSettingRaw('mig_5g_klphone')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
+  if (row) {
+    const info = JSON.parse(row.value);
+    const head = (info.teachers || []).find(t => /классн\S*\s+рук/i.test(t.role || ''));
+    if (head && !head.contact) head.contact = '+7 993 789-44-70';
+    q("UPDATE class_settings SET value=? WHERE class_id=? AND key='info'").run(JSON.stringify(info), cl.id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_klphone', '1')").run();
+}
 // каникулы 2026/27 для 5Г (из календарного графика МАОУ НЭЛ)
 if (!getSettingRaw('mig_5g_holidays')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -915,16 +927,18 @@ const server = http.createServer(async (req, res) => {
     const mm = /^\/c\/([a-z0-9-]+)\/manifest\.webmanifest$/.exec(p);
     if (mm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(mm[1]); if (!c) return fail(res, 404, 'Не найдено');
-      const admin = url.searchParams.get('admin') === '1';
+      const admin = url.searchParams.get('admin') === '1', teacher = url.searchParams.get('t') === '1';
+      if (teacher) return sendManifest(res, { name: 'Учитель: ' + c.title, short: c.title, start: `/c/${c.slug}/uchitel`, id: `/c/${c.slug}/uchitel` });
       return sendManifest(res, { name: (admin ? 'Казначей: ' : 'Касса: ') + c.title, short: admin ? 'Казначей' : 'Касса класса', start: `/c/${c.slug}${admin ? '/admin' : ''}`, id: `/c/${c.slug}${admin ? '/admin' : ''}` });
     }
-    const cm = /^\/c\/([a-z0-9-]+)(\/admin)?\/?$/.exec(p);
+    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/uchitel)?\/?$/.exec(p);
     if (cm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(cm[1]);
       if (!c) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><p style="font:18px system-ui;padding:24px">Класс не найден. Проверьте ссылку.</p><p style="font:16px system-ui;padding:0 24px"><a href="/">На главную</a></p>'); }
-      const html = fs.readFileSync(path.join(PUBLIC_DIR, cm[2] ? 'admin.html' : 'index.html'), 'utf8')
-        .replace('<!--HEAD-->', `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${cm[2] ? '?admin=1' : ''}">`)
-        .replace(/<title>[^<]*<\/title>/, `<title>${esc(cm[2] ? 'Казначей · ' + c.title : c.title)}</title>`);
+      const isAdm = cm[2] === '/admin', isT = cm[2] === '/uchitel';
+      const html = fs.readFileSync(path.join(PUBLIC_DIR, isAdm ? 'admin.html' : 'index.html'), 'utf8')
+        .replace('<!--HEAD-->', `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
+        .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Казначей · ' + c.title : c.title)}</title>`);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end(html);
     }

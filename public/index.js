@@ -1,6 +1,8 @@
 'use strict';
 // Общая страница для родителей
 let S = null;
+// версия для учителя: без сборов, денег и чеков
+const TEACHER = /\/uchitel\/?$/.test(location.pathname);
 
 async function load() {
   try { S = await api('GET', '/api/public'); }
@@ -9,6 +11,15 @@ async function load() {
   $('#title').textContent = S.class.title;
   $('#sub').textContent = '';
   $('#install').replaceChildren(installButton() || '');
+  if (TEACHER) {
+    $('#sub').textContent = 'Для учителя';
+    $('#totals').replaceChildren(); $('#totals').hidden = true;
+    return tabs($('#tabs'), [
+      { id: 'инфо', label: 'Информация' },
+      ...(S.books?.length ? [{ id: 'учебники', label: 'Учебники' }] : []),
+      { id: 'класс', label: 'Список класса' },
+    ], show);
+  }
   $('#totals').replaceChildren(
     h('div.total', h('div.label', 'Собрано'), h('div.value', rub(S.totals.collected))),
     h('div.total', h('div.label', 'Потрачено'), h('div.value', rub(S.totals.spent))),
