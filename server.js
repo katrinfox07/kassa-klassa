@@ -882,7 +882,7 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
   const sp = new URL(req.url, 'http://x').searchParams;
   const t = tutorOf(c, p.tok), date = isDate(sp.get('date')) ? sp.get('date') : today(), lesson = Math.max(0, Math.min(12, int(sp.get('lesson')) || 0));
   send(res, 200, {
-    lesson, done: q('SELECT DISTINCT lesson FROM marks WHERE tutor_id=? AND date=?').all(t.id, date).map(r => r.lesson),
+    lesson, done: q('SELECT lesson, MAX(subject) subject FROM marks WHERE tutor_id=? AND date=? GROUP BY lesson').all(t.id, date),
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
     students: q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id),
     marks: q('SELECT student_id, mark, ready, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),

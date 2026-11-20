@@ -597,6 +597,9 @@ function lessonsFor(info, dateStr) {
 function lessonView(tok, opts = {}) {
   const box = h('div.stack');
   let date = localISO(), lesson = null;
+  const custom = {}; // уроки, которые учитель выбрал сам (расписание могли поменять): дата -> [{n, subject}]
+  const allSubjects = [...new Set((opts.info?.timetable || []).flatMap(d => (d.lessons || '').split('\n').map(x => x.trim())).filter(x => x && !/^[-\u2013\u2014]+$/.test(x)))].sort();
+  const merge = (base, extra) => { const out = base.map(l => ({ ...l })); for (const e of extra) { const l = out.find(x => x.n === e.n); if (l) { if (e.subject) l.subject = e.subject; } else out.push({ ...e }); } return out.sort((a, b) => a.n - b.n); };
   const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
   // какой урок выбрать сразу: идущий сейчас, иначе первый по предмету учителя, иначе первый
   const pick = list => {
@@ -611,9 +614,21 @@ function lessonView(tok, opts = {}) {
   };
   const load = async () => {
     box.replaceChildren(h('section.card', h('p.muted', 'Загружаем…')));
-    const list = lessonsFor(opts.info, date);
-    if (!lesson || !list.some(l => l.n === lesson.n)) lesson = pick(list) || { n: 0, subject: '' };
+    let list = merge(lessonsFor(opts.info, date), custom[date] || []);
+    if (!lesson || !list.some(l => l.n === lesson.n)) lesson = pick(list) || { n: 1, subject: '' };
     let d; try { d = await api('GET', `${tok}/day?date=${date}&lesson=${lesson.n}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
+    // уроки, где уже стоят отметки, показываем с тем предметом, который выбрал учитель
+    list = merge(list, d.done.map(x => ({ n: x.lesson, subject: x.subject })).filter(x => x.n > 0));
+    lesson = list.find(l => l.n === lesson.n) || lesson;
+    const doneN = d.done.map(x => x.lesson);
+    // свой урок: номер + предмет
+    const numSel = h('select', Array.from({ length: 9 }, (_, i) => h('option', { value: i + 1, selected: i + 1 === lesson.n }, (i + 1) + ' урок')));
+    const subjIn = h('input', { list: 'subj-list', placeholder: 'Предмет', value: '' });
+    const own = h('div.lown', { hidden: list.length > 0 }, numSel, subjIn, h('datalist#subj-list', allSubjects.map(x => h('option', { value: x }))),
+      h('button.btn.primary.small', { type: 'button', onclick: () => {
+        const l = { n: +numSel.value, subject: subjIn.value.trim() };
+        custom[date] = merge(custom[date] || [], [l]); lesson = l; load();
+      } }, 'Выбрать'));
     const byId = Object.fromEntries(d.marks.map(m => [m.student_id, m]));
     const dateIn = h('input', { type: 'date', value: date, max: localISO(), onchange: e => { date = e.target.value || localISO(); load(); } });
     const stat = h('span.small.muted');
@@ -650,8 +665,11 @@ function lessonView(tok, opts = {}) {
     });
     box.replaceChildren(
       h('section.card.ltop', h('div.row.between', h('h3', '📝 Сегодня на уроке'), dateIn),
-        list.length ? h('div.lpick', list.map(l => h('button.lchip' + (l.n === lesson.n ? '.on' : '') + (d.done.includes(l.n) ? '.done' : ''), { type: 'button', onclick: () => { lesson = l; load(); } },
-          h('b', l.n + ' урок'), l.subject ? h('span', l.subject) : null, l.start ? h('small', l.start) : null))) : h('p.small.muted', 'В этот день уроков по расписанию нет.'),
+        list.length ? h('div.lpick', list.map(l => h('button.lchip' + (l.n === lesson.n ? '.on' : '') + (doneN.includes(l.n) ? '.done' : ''), { type: 'button', onclick: () => { lesson = l; load(); } },
+          h('b', l.n + ' урок'), l.subject ? h('span', l.subject) : null, l.start ? h('small', l.start) : null)),
+          h('button.lchip.lother', { type: 'button', onclick: () => { own.hidden = !own.hidden; if (!own.hidden) { subjIn.value = lesson.subject || ''; subjIn.focus(); } } }, h('b', 'Другой'), h('span', '✎ урок'))) : null,
+        list.length ? null : h('p.small.muted', 'В этот день уроков по расписанию нет. Выберите урок сами.'),
+        own,
         h('div.llegend', h('span', '🙂 хорошо (у всех сразу)'), h('span', '⭐ умница'), h('span', '💬 замечание'), h('span', '🎒 не готов(а)'), h('span', '✎ комментарий')),
         h('div.row.between.small', h('span.muted', 'Сохраняется само'), stat)),
       h('section.card.lessons-list', rows));

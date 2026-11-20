@@ -744,3 +744,7 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .lchip b { font-size: 12px; color: var(--muted); } .lchip span { font-weight: 700; font-size: 14px; } .lchip small { font-size: 11.5px; color: var(--muted); }
 .lchip.done b::after { content: ' ✓'; color: var(--ok); }
 .lchip.on { background: var(--grad); color: #fff; box-shadow: none; } .lchip.on b, .lchip.on small { color: rgba(255,255,255,.85); } .lchip.on.done b::after { color: #fff; }
+.lown { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; }
+.lown[hidden] { display: none; }
+.lown select, .lown input { height: 36px; min-height: 0; padding: 4px 8px; font-size: 14px; }
+.lchip.lother { background: transparent; border: 1.5px dashed var(--line); box-shadow: none; min-width: 80px; }
