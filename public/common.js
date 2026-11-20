@@ -580,7 +580,7 @@ const MARK = {
 const PHRASES = {
   star: ['Активно работал(а) на уроке', 'Поддержал(а) одноклассника', 'Вежливо общался(ась) с другими', 'Помог(ла) навести порядок в классе', 'Был(а) примером для класса'],
   note: ['Отвлекался(ась) во время объяснения', 'Не успел(а) выполнить задание', 'Разговаривал(а) на уроке', 'Нужна помощь с темой', 'Постарается в следующий раз'],
-  ready: ['Нет учебника', 'Нет тетради', 'Не сделано домашнее задание', 'Нет формы'],
+  ready: ['Нет учебника', 'Нет тетради', 'Нет дневника', 'Нет пенала', 'Не сделано домашнее задание', 'Нет формы'],
 };
 // страница учителя «Сегодня на уроке»: tok - личный код учителя
 // окончания по полу: «Помог(ла)» -> «Помог» / «Помогла», «Старался(ась)» -> «Старался» / «Старалась»
@@ -654,6 +654,7 @@ function lessonView(tok, opts = {}) {
       const saved = h('span.lsv');
       let timer = null;
       const save = () => {
+        m.help = /одноклассника/.test(m.comment) ? 1 : 0; // «Поддержал(а) одноклассника» = помощь другу (звёзды и шаги карты)
         drawState();
         clearTimeout(timer);
         timer = setTimeout(async () => {
@@ -669,15 +670,16 @@ function lessonView(tok, opts = {}) {
       const comment = h('input.lcom', { value: m.comment, maxlength: 300, placeholder: 'Комментарий (необязательно)', oninput: e => { m.comment = e.target.value; save(); } });
       const chips = h('div.lchips');
       const drawChips = () => {
-        const list = [...(PHRASES[m.mark] || []).filter(t => !/однокласснику/.test(t)), ...(m.ready ? [] : PHRASES.ready)].map(t => G(t, s.gender));
+        // после «Не готов(а)» - только фразы про готовность, иначе - фразы к отметке
+        const list = (focus === 'ready' && !m.ready ? PHRASES.ready : (PHRASES[m.mark] || [])).map(t => G(t, s.gender));
         chips.replaceChildren(...list.map(t => h('button.chip', { type: 'button', onclick: () => { m.comment = m.comment ? (m.comment.includes(t) ? m.comment : m.comment + '; ' + t) : t; comment.value = m.comment; save(); } }, t)));
       };
+      let focus = m.ready ? 'mark' : 'ready';
       const markBtns = Object.entries(MARK).map(([k, v]) => h('button.pbtn.' + k + (m.mark === k ? '.on' : ''), { type: 'button', onclick: e => {
-        m.mark = k; markBtns.forEach(b => b.classList.toggle('on', b === e.currentTarget)); drawChips(); save();
+        m.mark = k; focus = 'mark'; markBtns.forEach(b => b.classList.toggle('on', b === e.currentTarget)); drawChips(); save();
       } }, h('span.pic', v.icon), v.label));
-      const readyB = h('button.pbtn.tog' + (m.ready ? '' : '.on.warn'), { type: 'button', onclick: () => { m.ready = m.ready ? 0 : 1; readyB.classList.toggle('on', !m.ready); readyB.classList.toggle('warn', !m.ready); drawChips(); save(); } }, h('span.pic', '🎒'), G('Не готов(а) к уроку', s.gender));
-      const helpB = h('button.pbtn.tog' + (m.help ? '.on' : ''), { type: 'button', onclick: () => { m.help = m.help ? 0 : 1; helpB.classList.toggle('on', !!m.help); save(); } }, h('span.pic', '🤝'), G('Помог(ла) однокласснику', s.gender));
-      const panel = h('div.lpanel', h('div.pmarks', markBtns), h('div.ptogs', helpB, readyB), comment, chips);
+      const readyB = h('button.pbtn.tog' + (m.ready ? '' : '.on.warn'), { type: 'button', onclick: () => { m.ready = m.ready ? 0 : 1; focus = m.ready ? 'mark' : 'ready'; readyB.classList.toggle('on', !m.ready); readyB.classList.toggle('warn', !m.ready); drawChips(); save(); } }, h('span.pic', '🎒'), G('Не готов(а) к уроку', s.gender));
+      const panel = h('div.lpanel', h('div.pmarks', markBtns), h('div.ptogs', readyB), comment, chips);
       const head = h('button.lmain', { type: 'button', 'aria-expanded': 'false', onclick: () => {
         const open = !row.classList.contains('open');
         if (openRow && openRow !== row) { openRow.classList.remove('open'); openRow.querySelector('.lmain').setAttribute('aria-expanded', 'false'); }
@@ -754,7 +756,7 @@ function starsView(base, opts = {}) {
       expeditionView(D),
       h('section.card', h('h3', '⭐ Звёзды учеников'),
         h('p.small.muted', 'Видите только вы. Детям не показываем ни рейтингов, ни сравнений. Ребёнку можно сказать его звёзды лично. Нажмите на имя, чтобы начислить, обменять или подарить.'),
-        h('p.small.muted', 'Звёзды: «Умница» +1, «Помог(ла) однокласснику» +3, неделя без «Не готов(а)» +2. Звания только растут: 🌱 Новичок, 🧭 Искатель (10), 🛡 Мастер (30), 👑 Легенда (60).'),
+        h('p.small.muted', 'Звёзды: «Умница» +1, фраза «Поддержал(а) одноклассника» +3, неделя без «Не готов(а)» +2. Звания только растут: 🌱 Новичок, 🧭 Искатель (10), 🛡 Мастер (30), 👑 Легенда (60).'),
         kidsBox),
       D.log.length ? h('section.card', h('h3', 'История'), h('ul.plain.st-log', D.log.map(t => h('li',
         h('span.muted.small', t.date.split('-').reverse().slice(0, 2).join('.') + ' '),
