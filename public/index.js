@@ -2,7 +2,7 @@
 // Общая страница для родителей
 let S = null;
 // версия для учителя: без сборов, денег и чеков
-const TEACHER = /\/uchitel\/?$/.test(location.pathname);
+const TEACHER = /\/klassruk\/?$/.test(location.pathname);
 
 async function load() {
   try { S = await api('GET', '/api/public'); }
@@ -12,7 +12,7 @@ async function load() {
   $('#sub').textContent = '';
   $('#install').replaceChildren(installButton() || '');
   if (TEACHER) {
-    $('#sub').textContent = 'Для учителя';
+    $('#sub').textContent = 'Для классного руководителя';
     $('#totals').replaceChildren(); $('#totals').hidden = true;
     return tabs($('#tabs'), [
       { id: 'инфо', label: 'Информация' },

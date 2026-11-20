@@ -405,10 +405,10 @@ VIEWS['настройки'] = () => {
       h('p.hint', 'Отправьте её в чат класса. Родителям не нужно регистрироваться.'),
       h('div.row', h('input.grow', { value: classUrl(), readonly: true, onclick: e => e.target.select() }),
         h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl()); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))),
-    h('section.card.form', h('h3', 'Ссылка для учителя'),
+    h('section.card.form', h('h3', 'Ссылка для классрука'),
       h('p.hint', 'Та же страница, но без сборов, денег и чеков: только информация, учебники и список класса.'),
-      h('div.row', h('input.grow', { value: classUrl() + '/uchitel', readonly: true, onclick: e => e.target.select() }),
-        h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl() + '/uchitel'); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))));
+      h('div.row', h('input.grow', { value: classUrl() + '/klassruk', readonly: true, onclick: e => e.target.select() }),
+        h('button.btn', { onclick: async () => { try { await navigator.clipboard.writeText(classUrl() + '/klassruk'); toast('Скопировано'); } catch { toast('Выделите и скопируйте'); } } }, 'Копировать'))));
 };
 
 start();

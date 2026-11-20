@@ -928,14 +928,16 @@ const server = http.createServer(async (req, res) => {
     if (mm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(mm[1]); if (!c) return fail(res, 404, 'Не найдено');
       const admin = url.searchParams.get('admin') === '1', teacher = url.searchParams.get('t') === '1';
-      if (teacher) return sendManifest(res, { name: 'Учитель: ' + c.title, short: c.title, start: `/c/${c.slug}/uchitel`, id: `/c/${c.slug}/uchitel` });
+      if (teacher) return sendManifest(res, { name: 'Классрук: ' + c.title, short: c.title, start: `/c/${c.slug}/klassruk`, id: `/c/${c.slug}/klassruk` });
       return sendManifest(res, { name: (admin ? 'Казначей: ' : 'Касса: ') + c.title, short: admin ? 'Казначей' : 'Касса класса', start: `/c/${c.slug}${admin ? '/admin' : ''}`, id: `/c/${c.slug}${admin ? '/admin' : ''}` });
     }
-    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/uchitel)?\/?$/.exec(p);
+    const um = /^\/c\/([a-z0-9-]+)\/uchitel\/?$/.exec(p);
+    if (um) { res.writeHead(301, { Location: `/c/${um[1]}/klassruk` }); return res.end(); }
+    const cm = /^\/c\/([a-z0-9-]+)(\/admin|\/klassruk)?\/?$/.exec(p);
     if (cm) {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(cm[1]);
       if (!c) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><p style="font:18px system-ui;padding:24px">Класс не найден. Проверьте ссылку.</p><p style="font:16px system-ui;padding:0 24px"><a href="/">На главную</a></p>'); }
-      const isAdm = cm[2] === '/admin', isT = cm[2] === '/uchitel';
+      const isAdm = cm[2] === '/admin', isT = cm[2] === '/klassruk';
       const html = fs.readFileSync(path.join(PUBLIC_DIR, isAdm ? 'admin.html' : 'index.html'), 'utf8')
         .replace('<!--HEAD-->', `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
         .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Казначей · ' + c.title : c.title)}</title>`);
