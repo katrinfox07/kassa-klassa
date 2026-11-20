@@ -26,7 +26,11 @@ async function load() {
       if (TEACHER && e.status === 404) { tuSet(null); TUTOR = null; return pinScreen('ПИН сменился. Введите новый.'); }
       $('#main').replaceChildren(h('p.empty', e.message)); return;
     }
-    $('#sub').textContent = TU.name + (TU.subject ? ' · ' + TU.subject : '');
+    // в шапке ФИО полностью: берём из карточки учителя на «Информации», если там написано полнее
+    const sur = TU.name.trim().split(/\s+/)[0].toLowerCase();
+    const card = (S.info?.teachers || []).find(t => String(t.name || '').trim().split(/\s+/)[0].toLowerCase() === sur);
+    const full = card && card.name.length > TU.name.length ? card.name : TU.name;
+    $('#sub').textContent = full + (TU.subject && !/классн/i.test(TU.subject) ? ' · ' + TU.subject : TU.head ? ' · классный руководитель' : '');
     if (TEACHER) $('#install').replaceChildren(h('button.btn.small', { style: 'background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.4)', onclick: () => { tuSet(null); location.reload(); } }, 'Выйти'));
     else $('#install').replaceChildren();
     return tabs($('#tabs'), [
@@ -53,7 +57,7 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
-  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`, { info: S.info, subject: TU?.subject }));
+  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`, { info: S.info, subject: TU?.subject, tutor: TU }));
   if (id === 'звёзды') m.replaceChildren(starsView(`/api/t/${TUTOR}/stars`));
   if (id === 'экспедиция') { m.replaceChildren(h('section.card', h('p.muted', 'Загружаем…'))); api('GET', TUTOR ? `/api/t/${TUTOR}/stars` : '/api/expedition').then(d => m.replaceChildren(expeditionView(d)), e => m.replaceChildren(h('p.empty', e.message))); }
   if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));

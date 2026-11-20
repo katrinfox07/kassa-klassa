@@ -1,5 +1,5 @@
 // Сервис-воркер: приложение ставится на телефон и открывается даже при плохой связи.
-const CACHE = 'kassa-v7';
+const CACHE = 'kassa-v8';
 const STATIC = ['/app.css', '/common.js', '/index.js', '/admin.js', '/account.js', '/icon.svg', '/icon-192.png', '/offline.html'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

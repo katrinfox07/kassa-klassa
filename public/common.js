@@ -583,6 +583,22 @@ const PHRASES = {
   ready: ['Нет учебника', 'Нет тетради', 'Не сделано домашнее задание', 'Нет формы'],
 };
 // страница учителя «Сегодня на уроке»: tok - личный код учителя
+// окончания по полу: «Помог(ла)» -> «Помог» / «Помогла», «Старался(ась)» -> «Старался» / «Старалась»
+function G(text, g) {
+  if (!g) return text;
+  return String(text || '').replace(/([А-Яа-яЁё]*)ся\(ась\)/g, (m, w) => g === 'f' ? w + 'ась' : w + 'ся').replace(/\(([а-яё]{1,3})\)/g, (m, x) => g === 'f' ? x : '');
+}
+// предметы учителя: из карточки на «Информации» (по фамилии) + поле «Предмет» в кабинете
+const SUBJ_ALIAS = { 'english': 'английский язык', 'информатика и икт': 'информатика', 'наглядная геометрия': 'математика', 'физкультура': 'физкультура (зал)' };
+const normSubj = x => { const t = String(x || '').toLowerCase().replace(/,?\s*гр\.?\s*\d+/g, '').replace(/\s+/g, ' ').trim(); return SUBJ_ALIAS[t] || t; };
+function tutorSubjects(info, tutor) {
+  if (!tutor) return [];
+  const sur = String(tutor.name || '').trim().split(/\s+/)[0].toLowerCase();
+  const card = (info?.teachers || []).find(t => String(t.name || '').trim().split(/\s+/)[0].toLowerCase() === sur);
+  const raw = [card?.role || '', tutor.subject || ''].join(';').split(/[;,]/).map(normSubj).filter(x => x && !/классн/.test(x));
+  if (tutor.head || /классн\S*\s+рук/i.test(card?.role || '')) raw.push('разговоры о важном');
+  return [...new Set(raw)];
+}
 // уроки дня по расписанию класса: [{n, subject, start, end}]
 function lessonsFor(info, dateStr) {
   const bells = info?.bells || [], days = (info?.timetable || []).filter(d => d.day);
@@ -598,7 +614,9 @@ function lessonView(tok, opts = {}) {
   const box = h('div.stack');
   let date = localISO(), lesson = null;
   const custom = {}; // уроки, которые учитель выбрал сам (расписание могли поменять): дата -> [{n, subject}]
-  const allSubjects = [...new Set((opts.info?.timetable || []).flatMap(d => (d.lessons || '').split('\n').map(x => x.trim())).filter(x => x && !/^[-\u2013\u2014]+$/.test(x)))].sort();
+  const mine = tutorSubjects(opts.info, opts.tutor);
+  const isMine = subj => !mine.length || mine.includes(normSubj(subj));
+  const allSubjects = [...new Set((opts.info?.timetable || []).flatMap(d => (d.lessons || '').split('\n').map(x => x.trim())).filter(x => x && !/^[-\u2013\u2014]+$/.test(x)))].filter(isMine).sort();
   const merge = (base, extra) => { const out = base.map(l => ({ ...l })); for (const e of extra) { const l = out.find(x => x.n === e.n); if (l) { if (e.subject) l.subject = e.subject; } else out.push({ ...e }); } return out.sort((a, b) => a.n - b.n); };
   const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
   // какой урок выбрать сразу: идущий сейчас, иначе первый по предмету учителя, иначе первый
@@ -614,7 +632,7 @@ function lessonView(tok, opts = {}) {
   };
   const load = async () => {
     box.replaceChildren(h('section.card', h('p.muted', 'Загружаем…')));
-    let list = merge(lessonsFor(opts.info, date), custom[date] || []);
+    let list = merge(lessonsFor(opts.info, date).filter(l => isMine(l.subject)), custom[date] || []);
     if (!lesson || !list.some(l => l.n === lesson.n)) lesson = pick(list) || { n: 1, subject: '' };
     let d; try { d = await api('GET', `${tok}/day?date=${date}&lesson=${lesson.n}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
     // уроки, где уже стоят отметки, показываем с тем предметом, который выбрал учитель
@@ -623,8 +641,8 @@ function lessonView(tok, opts = {}) {
     const doneN = d.done.map(x => x.lesson);
     // свой урок: номер + предмет
     const numSel = h('select', Array.from({ length: 9 }, (_, i) => h('option', { value: i + 1, selected: i + 1 === lesson.n }, (i + 1) + ' урок')));
-    const subjIn = h('input', { list: 'subj-list', placeholder: 'Предмет', value: '' });
-    const own = h('div.lown', { hidden: list.length > 0 }, numSel, subjIn, h('datalist#subj-list', allSubjects.map(x => h('option', { value: x }))),
+    const subjIn = allSubjects.length ? h('select', allSubjects.map(x => h('option', { value: x }, x))) : h('input', { placeholder: 'Предмет', value: '' });
+    const own = h('div.lown', { hidden: list.length > 0 }, numSel, subjIn,
       h('button.btn.primary.small', { type: 'button', onclick: () => {
         const l = { n: +numSel.value, subject: subjIn.value.trim() };
         custom[date] = merge(custom[date] || [], [l]); lesson = l; load();
@@ -634,44 +652,54 @@ function lessonView(tok, opts = {}) {
     const stat = h('span.small.muted');
     const updStat = () => { const v = Object.values(byId); stat.textContent = `⭐ ${v.filter(m => m.mark === 'star').length} · 💬 ${v.filter(m => m.mark === 'note').length} · не готовы ${v.filter(m => m.ready === 0).length}`; };
     updStat();
+    let openRow = null; // открыта всегда одна панель
     const rows = d.students.map(s => {
       const m = byId[s.id] || { mark: 'good', ready: 1, help: 0, comment: '' };
       const saved = h('span.lsv');
       let timer = null;
       const save = () => {
+        drawState();
         clearTimeout(timer);
         timer = setTimeout(async () => {
           try { await api('PUT', `${tok}/mark`, { date, lesson: lesson.n, subject: lesson.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, help: !!m.help, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
           catch (e) { toast(e.message, true); }
         }, 400);
       };
+      const state = h('span.lstate');
+      const drawState = () => {
+        state.replaceChildren(MARK[m.mark].icon, m.help ? ' 🤝' : '', m.ready ? '' : ' 🎒', m.comment ? ' ✎' : '');
+        row.dataset.mark = m.mark; row.classList.toggle('notready', !m.ready);
+      };
       const comment = h('input.lcom', { value: m.comment, maxlength: 300, placeholder: 'Комментарий (необязательно)', oninput: e => { m.comment = e.target.value; save(); } });
       const chips = h('div.lchips');
       const drawChips = () => {
-        const list = [...(PHRASES[m.mark] || []), ...(m.ready ? [] : PHRASES.ready)];
-        chips.replaceChildren(...list.map(t => h('button.chip', { type: 'button', onpointerdown: e => e.preventDefault(), onclick: () => { m.comment = m.comment ? (m.comment.includes(t) ? m.comment : m.comment + '; ' + t) : t; comment.value = m.comment; save(); } }, t)));
-        row.classList.toggle('nocom', !m.comment);
-        row.classList.toggle('open', forceOpen || m.mark !== 'good' || !m.ready || !!m.comment);
+        const list = [...(PHRASES[m.mark] || []).filter(t => !/однокласснику/.test(t)), ...(m.ready ? [] : PHRASES.ready)].map(t => G(t, s.gender));
+        chips.replaceChildren(...list.map(t => h('button.chip', { type: 'button', onclick: () => { m.comment = m.comment ? (m.comment.includes(t) ? m.comment : m.comment + '; ' + t) : t; comment.value = m.comment; save(); } }, t)));
       };
-      const seg = h('div.lseg', Object.entries(MARK).map(([k, v]) => h('button.lbtn.' + k + (m.mark === k ? '.on' : ''), { type: 'button', onclick: e => {
-        m.mark = k; seg.querySelectorAll('.lbtn').forEach(b => b.classList.toggle('on', b === e.currentTarget)); row.dataset.mark = k; drawChips(); save();
-      } }, v.icon)));
-      let forceOpen = false;
-      const helpB = h('button.lhelp' + (m.help ? '.on' : ''), { type: 'button', title: 'Помог(ла) однокласснику', 'aria-label': 'Помог(ла) однокласснику', onclick: () => { m.help = m.help ? 0 : 1; helpB.classList.toggle('on', !!m.help); save(); } }, '🤝');
-      const ready = h('button.lready' + (m.ready ? '' : '.off'), { type: 'button', title: 'Готовность к уроку', 'aria-label': 'Не готов(а) к уроку', onclick: () => { m.ready = m.ready ? 0 : 1; ready.classList.toggle('off', !m.ready); drawChips(); save(); } }, '🎒');
-      const pen = h('button.lpen', { type: 'button', title: 'Комментарий', 'aria-label': 'Комментарий', onclick: () => { forceOpen = !forceOpen || !!m.comment; drawChips(); if (row.classList.contains('open')) comment.focus(); } }, '✎');
-      const row = h('div.lrow', { 'data-mark': m.mark }, h('div.lmain', h('span.lname', s.name, saved), seg, helpB, ready, pen), h('div.lextra', comment, chips));
-      drawChips();
+      const markBtns = Object.entries(MARK).map(([k, v]) => h('button.pbtn.' + k + (m.mark === k ? '.on' : ''), { type: 'button', onclick: e => {
+        m.mark = k; markBtns.forEach(b => b.classList.toggle('on', b === e.currentTarget)); drawChips(); save();
+      } }, h('span.pic', v.icon), v.label));
+      const readyB = h('button.pbtn.tog' + (m.ready ? '' : '.on.warn'), { type: 'button', onclick: () => { m.ready = m.ready ? 0 : 1; readyB.classList.toggle('on', !m.ready); readyB.classList.toggle('warn', !m.ready); drawChips(); save(); } }, h('span.pic', '🎒'), G('Не готов(а) к уроку', s.gender));
+      const helpB = h('button.pbtn.tog' + (m.help ? '.on' : ''), { type: 'button', onclick: () => { m.help = m.help ? 0 : 1; helpB.classList.toggle('on', !!m.help); save(); } }, h('span.pic', '🤝'), G('Помог(ла) однокласснику', s.gender));
+      const panel = h('div.lpanel', h('div.pmarks', markBtns), h('div.ptogs', helpB, readyB), comment, chips);
+      const head = h('button.lmain', { type: 'button', 'aria-expanded': 'false', onclick: () => {
+        const open = !row.classList.contains('open');
+        if (openRow && openRow !== row) { openRow.classList.remove('open'); openRow.querySelector('.lmain').setAttribute('aria-expanded', 'false'); }
+        row.classList.toggle('open', open); head.setAttribute('aria-expanded', String(open)); openRow = open ? row : null;
+        if (open) setTimeout(() => { const r = row.getBoundingClientRect(); if (r.top < 60 || r.bottom > innerHeight) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 30);
+      } }, h('span.lname', s.name, saved), state, h('span.lchev', '›'));
+      const row = h('div.lrow', { 'data-mark': m.mark }, head, panel);
+      drawState(); drawChips();
       return row;
     });
     box.replaceChildren(
       h('section.card.ltop', h('div.row.between', h('h3', '📝 Сегодня на уроке'), dateIn),
         list.length ? h('div.lpick', list.map(l => h('button.lchip' + (l.n === lesson.n ? '.on' : '') + (doneN.includes(l.n) ? '.done' : ''), { type: 'button', onclick: () => { lesson = l; load(); } },
           h('b', l.n + ' урок'), l.subject ? h('span', l.subject) : null, l.start ? h('small', l.start) : null)),
-          h('button.lchip.lother', { type: 'button', onclick: () => { own.hidden = !own.hidden; if (!own.hidden) { subjIn.value = lesson.subject || ''; subjIn.focus(); } } }, h('b', 'Другой'), h('span', '✎ урок'))) : null,
-        list.length ? null : h('p.small.muted', 'В этот день уроков по расписанию нет. Выберите урок сами.'),
+          h('button.lchip.lother', { type: 'button', onclick: () => { own.hidden = !own.hidden; if (!own.hidden && lesson.subject && allSubjects.includes(lesson.subject)) subjIn.value = lesson.subject; } }, h('b', 'Другой'), h('span', '✎ урок'))) : null,
+        list.length ? null : h('p.small.muted', 'В этот день ваших уроков по расписанию нет. Если расписание поменяли, выберите урок сами.'),
         own,
-        h('div.llegend', h('span', '🙂 хорошо (у всех сразу)'), h('span', '⭐ умница'), h('span', '💬 замечание'), h('span', '🤝 помог(ла) однокласснику'), h('span', '🎒 не готов(а)'), h('span', '✎ комментарий')),
+        h('p.small.muted', '🙂 Хорошо (у всех по умолчанию). Нажмите на ученика, чтобы поставить другую отметку.'),
         h('div.row.between.small', h('span.muted', 'Сохраняется само'), stat)),
       h('section.card.lessons-list', rows));
   };
@@ -681,7 +709,7 @@ function lessonView(tok, opts = {}) {
 // журнал: все отметки за период (для кабинета и классного руководителя)
 function journalView(fetchUrl, students) {
   const box = h('div.stack');
-  const names = Object.fromEntries((students || []).map(s => [s.id, s.name]));
+  const names = Object.fromEntries((students || []).map(s => [s.id, s.name])), gen = Object.fromEntries((students || []).map(s => [s.id, s.gender]));
   let range = 'week';
   const load = async () => {
     const t = new Date(), to = localISO(t);
@@ -698,7 +726,7 @@ function journalView(fetchUrl, students) {
       ids.length ? h('div.jlist', ids.map(id => {
         const x = per[id];
         return h('details.jrow', h('summary', h('b', names[id] || 'Ученик'), h('span.jsum', x.star ? h('span.jpill.star', '⭐ ' + x.star) : null, x.note ? h('span.jpill.note', '💬 ' + x.note) : null, x.notReady ? h('span.jpill.ready', '🎒 ' + x.notReady) : null)),
-          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + (m.lesson ? ', ' + m.lesson + ' урок' : '') + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.ready ? null : ' · 🎒 не готов(а)', m.comment ? h('div.small', m.comment) : null))));
+          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + (m.lesson ? ', ' + m.lesson + ' урок' : '') + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.help ? ' · 🤝 ' + G('помог(ла) однокласснику', gen[m.student_id]) : null, m.ready ? null : ' · 🎒 ' + G('не готов(а)', gen[m.student_id]), m.comment ? h('div.small', G(m.comment, gen[m.student_id])) : null))));
       })) : h('p.muted', 'За этот период особых отметок нет.')));
   };
   load();
@@ -737,7 +765,7 @@ function starsView(base, opts = {}) {
         kidsBox),
       D.log.length ? h('section.card', h('h3', 'История'), h('ul.plain.st-log', D.log.map(t => h('li',
         h('span.muted.small', t.date.split('-').reverse().slice(0, 2).join('.') + ' '),
-        h('span', t.kind === 'award' ? `${t.name}: +${t.amount} ⭐ ${t.note}` : t.kind === 'spend' ? `${t.name}: обмен на «${t.note}» (${-t.amount} ⭐)` : t.amount < 0 ? `${t.name} подарил(а) ${-t.amount} ⭐ ${t.peer}` : `${t.name} получил(а) ${t.amount} ⭐ от ${t.peer}`),
+        h('span', t.kind === 'award' ? `${t.name}: +${t.amount} ⭐ ${t.note}` : t.kind === 'spend' ? `${t.name}: обмен на «${t.note}» (${-t.amount} ⭐)` : t.amount < 0 ? `${t.name} ${G('подарил(а)', t.gender)} ${-t.amount} ⭐ ${t.peer}` : `${t.name} ${G('получил(а)', t.gender)} ${t.amount} ⭐ от ${t.peer}`),
         t.kind === 'gift' && t.amount > 0 ? null : h('button.linklike.small', { onclick: () => act({ action: 'undo', id: t.id, student_id: 0 }) }, 'отменить'))))) : null,
       opts.settings ? opts.settings(D, set => { D = set; draw(); }) : null);
   };

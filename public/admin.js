@@ -293,7 +293,7 @@ function expenseDialog() {
 // ---------- Список класса ----------
 VIEWS['класс'] = () => {
   const ta = h('textarea', { rows: 3, placeholder: 'ФИО ребёнка, дата рождения, ФИО родителя - по одному на строку (можно вставить из таблицы)' });
-  const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, ...patch });
+  const save = (s, patch) => api('PUT', '/api/admin/students/' + s.id, { full_name: s.full_name || s.name, birth: s.birth, parent: s.parent, phone: s.phone, active: s.active, gender: s.gset, ...patch });
   return h('div.stack',
     h('section.card', h('p.hint', 'Родители видят этот список во вкладке «Список класса»' + (S.class.listCode ? ` после ввода кода ${S.class.listCode}` : '') + '. Чтобы поправить данные, нажмите на ребёнка.'),
       h('div.kidlist', S.students.map((s, i) => {
@@ -314,10 +314,11 @@ function editKid(s, save) {
     birth: h('input', { value: s.birth || '', maxlength: 20, placeholder: 'дд.мм.гггг' }),
     parent: h('textarea', { rows: 2, maxlength: 200 }, s.parent || ''),
     phone: h('input', { value: s.phone || '', maxlength: 200, type: 'tel', placeholder: '8-900-000-00-00, через запятую' }),
+    gender: h('select', h('option', { value: '', selected: !s.gset }, `Определять по имени (сейчас: ${s.gender === 'f' ? 'девочка' : 'мальчик'})`), h('option', { value: 'm', selected: s.gset === 'm' }, 'Мальчик'), h('option', { value: 'f', selected: s.gset === 'f' }, 'Девочка')),
   };
   const close = modal('Данные ребёнка', h('form.form', {
-    onsubmit: async e => { e.preventDefault(); await act(() => save(s, { full_name: f.full.value, birth: f.birth.value, parent: f.parent.value, phone: f.phone.value }), 'Сохранено')(); close(); },
-  }, h('label.field', 'ФИО ребёнка', f.full), h('label.field', 'Дата рождения', f.birth), h('label.field', 'Родители', f.parent), h('label.field', 'Телефоны', f.phone),
+    onsubmit: async e => { e.preventDefault(); await act(() => save(s, { full_name: f.full.value, birth: f.birth.value, parent: f.parent.value, phone: f.phone.value, gender: f.gender.value }), 'Сохранено')(); close(); },
+  }, h('label.field', 'ФИО ребёнка', f.full), h('label.field', 'Дата рождения', f.birth), h('label.field', 'Родители', f.parent), h('label.field', 'Телефоны', f.phone), h('label.field', 'Пол (для окончаний: помог / помогла)', f.gender),
     h('button.btn.primary', { type: 'submit' }, 'Сохранить'),
     h('button.linklike', { type: 'button', onclick: async () => { await act(() => save(s, { active: !s.active }))(); close(); } }, s.active ? 'Отметить, что ребёнок выбыл из класса' : 'Вернуть в класс')));
 }

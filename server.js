@@ -72,6 +72,22 @@ const q = (sql) => db.prepare(sql);
 db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
 const getSettingRaw = k => q('SELECT value FROM meta WHERE key=?').get(k)?.value;
 // миграция: полные данные ученика (видны только администратору)
+try { db.exec("ALTER TABLE students ADD COLUMN gender TEXT NOT NULL DEFAULT ''"); } catch {}
+// пол ребёнка для окончаний («помог/помогла»): по отчеству, иначе по имени; казначей может поправить вручную
+const MALE_A = /^(илья|никита|кузьма|фома|лука|савва|данила|гаврила|миша|саша|женя|ваня|дима|паша|петя|коля|вова|лёша|алёша|серёжа|гоша|тёма|слава|стёпа|федя|гриша|юра|митя|костя|сеня)$/;
+function guessGender(full, name) {
+  const w = String(full || name || '').trim().split(/\s+/);
+  const pat = (w[2] || '').toLowerCase();
+  if (/(вна|чна|кызы)$/.test(pat)) return 'f';
+  if (/(вич|ич|оглы)$/.test(pat)) return 'm';
+  const first = (w[1] || w[0] || '').toLowerCase();
+  if (!first) return '';
+  if (MALE_A.test(first)) return 'm';
+  if (/[ая]$/.test(first)) return 'f';
+  if (/(ь)$/.test(first)) return /^(любовь|адель|рахиль|нинель|ассоль|эсфирь)$/.test(first) ? 'f' : 'm';
+  return 'm';
+}
+const genderOf = s => s.gender || guessGender(s.full_name, s.name);
 for (const col of ['full_name', 'birth', 'parent', 'phone']) {
   try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
 }
@@ -337,7 +353,8 @@ function freeSlug(base) {
 // ---------- Данные класса ----------
 function classState(c, admin) {
   const cid = c.id;
-  const students = q('SELECT id, name, full_name, birth, parent, phone, active FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
+  const students = q('SELECT id, name, full_name, birth, parent, phone, active, gender FROM students WHERE class_id=? ORDER BY sort, name').all(cid);
+  for (const s of students) { s.gset = s.gender; s.gender = genderOf(s); }
   const collections = q('SELECT * FROM collections WHERE class_id=? ORDER BY closed, COALESCE(due_date, created_at) DESC, id DESC').all(cid);
   const payments = q(`SELECT id, collection_id, student_id, amount, status, payer, note, source, created_at, decided_at,
     screenshot IS NOT NULL AS has_shot FROM payments WHERE class_id=? AND (status != 'rejected' OR ?) ORDER BY created_at DESC`).all(cid, admin ? 1 : 0);
@@ -361,7 +378,7 @@ function classState(c, admin) {
     class: (({ listCode, ...rest }) => ({ ...rest, ...(admin ? { listCode } : { hasList: !!listCode }), title: c.title, slug: c.slug }))(getSetting(cid, 'class', {})),
     subscription: admin ? { paid_until: c.paid_until, active: c.paid_until >= today(), price: PRICE } : undefined,
     info: getSetting(cid, 'info', DEFAULT_INFO),
-    students: students.filter(s => s.active || admin).map(s => admin ? s : { id: s.id, name: s.name }),
+    students: students.filter(s => s.active || admin).map(s => admin ? s : { id: s.id, name: s.name, gender: s.gender }),
     birthdays: !admin && getSetting(cid, 'class', {}).showBirthdays ? students.filter(s => s.active).map(s => {
       const m = /^(\d{2})\.(\d{2})\./.exec(s.birth || ''); return m ? { name: s.name, md: `${m[2]}-${m[1]}` } : null; }).filter(Boolean) : undefined,
     collections,
@@ -552,8 +569,8 @@ route('POST', '/admin/students', (req, res, b, p, u, c) => {
 route('PUT', '/admin/students/:id', (req, res, b, p, u, c) => {
   const full = str(b.full_name || b.name, 160).replace(/\s+/g, ' ');
   const name = full.split(' ').slice(0, 2).join(' '); if (!name) bad('Введите имя');
-  q('UPDATE students SET name=?, full_name=?, birth=?, parent=?, phone=?, active=? WHERE id=? AND class_id=?')
-    .run(name, full, str(b.birth, 20), str(b.parent, 200), str(b.phone, 200), b.active ? 1 : 0, int(p.id), c.id);
+  q('UPDATE students SET name=?, full_name=?, birth=?, parent=?, phone=?, active=?, gender=? WHERE id=? AND class_id=?')
+    .run(name, full, str(b.birth, 20), str(b.parent, 200), str(b.phone, 200), b.active ? 1 : 0, ['m', 'f'].includes(b.gender) ? b.gender : '', int(p.id), c.id);
   send(res, 200, { ok: true });
 }, W);
 route('DELETE', '/admin/students/:id', (req, res, b, p, u, c) => {
@@ -855,6 +872,7 @@ if (!getSettingRaw('mig_5g_head')) {
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_head', '1')").run();
 }
 ensurePins();
+if (!getSettingRaw('mig_5g_headname')) { q("UPDATE tutors SET name='Власова Олеся Александровна' WHERE name='Власова О.А.'").run(); q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_headname', '1')").run(); }
 // 5Г: ПИН классрука 4470 (по просьбе администратора 20.11)
 if (!getSettingRaw('mig_5g_headpin')) {
   const c5 = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
@@ -885,7 +903,7 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
   send(res, 200, {
     lesson, done: q('SELECT lesson, MAX(subject) subject FROM marks WHERE tutor_id=? AND date=? GROUP BY lesson').all(t.id, date),
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
-    students: q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id),
+    students: q('SELECT id, name, full_name, gender FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id).map(s => ({ id: s.id, name: s.name, gender: genderOf(s) })),
     marks: q('SELECT student_id, mark, ready, help, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),
   });
 }, T);
@@ -980,7 +998,7 @@ const dayShift = (d, n) => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.g
 function starsState(c, full) {
   const set = getSetting(c.id, 'stars', {});
   const rewards = set.rewards || STAR_DEFAULTS.rewards, map = set.map || STAR_DEFAULTS.map;
-  const kids = q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id);
+  const kids = q('SELECT id, name, full_name, gender FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id).map(s => ({ id: s.id, name: s.name, gender: genderOf(s) }));
   const marks = q('SELECT student_id, date, mark, ready, help FROM marks WHERE class_id=? ORDER BY date').all(c.id);
   const tx = q('SELECT * FROM stars WHERE class_id=? ORDER BY id').all(c.id);
   const P = Object.fromEntries(kids.map(k => [k.id, { earned: 0, balance: 0, helps: 0, readyWeeks: 0, gave: 0 }]));
@@ -1028,10 +1046,11 @@ function starsState(c, full) {
   out.kids = kids.map(k => {
     const x = P[k.id], r = [...RANKS].reverse().find(r => x.earned >= r[0]);
     const next = RANKS.find(r => r[0] > x.earned);
-    return { id: k.id, name: k.name, balance: x.balance, earned: x.earned, rank: r[1], rankIcon: r[2], next: next ? { title: next[1], need: next[0] - x.earned } : null,
+    return { id: k.id, name: k.name, gender: k.gender, balance: x.balance, earned: x.earned, rank: r[1], rankIcon: r[2], next: next ? { title: next[1], need: next[0] - x.earned } : null,
       badges: [x.helps >= 3 && '🤝 Помощник', x.readyWeeks >= 1 && '🎒 Неделя без забытых тетрадей', x.gave >= 3 && '💛 Щедрая душа'].filter(Boolean) };
   });
-  out.log = tx.slice(-30).reverse().map(t => ({ id: t.id, date: t.created_at.slice(0, 10), name: nm[t.student_id] || '-', peer: nm[t.peer_id] || '', amount: t.amount, kind: t.kind, note: t.note }));
+  const gd = Object.fromEntries(kids.map(k => [k.id, k.gender]));
+  out.log = tx.slice(-30).reverse().map(t => ({ id: t.id, date: t.created_at.slice(0, 10), name: nm[t.student_id] || '-', gender: gd[t.student_id] || '', peer: nm[t.peer_id] || '', amount: t.amount, kind: t.kind, note: t.note }));
   return out;
 }
 function starsAction(c, b) {

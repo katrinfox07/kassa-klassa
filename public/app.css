@@ -770,3 +770,27 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .st-bal { font-weight: 800; white-space: nowrap; }
 .st-badges { margin-left: 6px; }
 .st-log li { padding: 4px 0; font-size: 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+
+/* урок: строка ребёнка раскрывается в панель с крупными кнопками */
+.lrow { padding: 0; border-bottom: 1px solid var(--line); }
+.lrow:last-child { border-bottom: 0; }
+.lmain { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; font: inherit; color: var(--text); text-align: left; padding: 12px 6px; cursor: pointer; min-height: 48px; }
+.lname { flex: 1; font-size: 15.5px; font-weight: 600; }
+.lstate { font-size: 19px; white-space: nowrap; }
+.lchev { color: var(--muted); font-size: 22px; transition: transform .2s; }
+.lrow.open .lchev { transform: rotate(90deg); }
+.lrow.open { background: var(--bg); border-radius: 14px; }
+.lpanel { display: none; padding: 4px 10px 14px; gap: 12px; }
+.lrow.open .lpanel { display: grid; }
+.pmarks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ptogs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pbtn { border: 0; font: inherit; font-size: 13.5px; font-weight: 700; line-height: 1.2; min-height: 64px; padding: 8px 6px; border-radius: 14px; background: var(--card); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--line); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.pbtn .pic { font-size: 24px; line-height: 1; }
+.pbtn.good.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.pbtn.star.on { background: var(--ok); color: #fff; box-shadow: none; }
+.pbtn.note.on { background: var(--warn); color: #fff; box-shadow: none; }
+.pbtn.tog.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.pbtn.tog.on.warn { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 2px var(--warn); }
+.lpanel .lcom { height: 44px; font-size: 15px; }
+.lpanel .lchips { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; }
+.lpanel .chip { font-size: 14px; padding: 9px 14px; }
