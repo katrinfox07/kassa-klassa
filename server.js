@@ -899,7 +899,7 @@ const T = { cls: true };
 route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
   rate(req, 'tutor', 300, 60e3);
   const sp = new URL(req.url, 'http://x').searchParams;
-  const t = tutorOf(c, p.tok), date = isDate(sp.get('date')) ? sp.get('date') : today(), lesson = Math.max(0, Math.min(12, int(sp.get('lesson')) || 0));
+  const t = tutorOf(c, p.tok), date = isDate(sp.get('date')) ? sp.get('date') : today(), lesson = Math.max(0, Math.min(999999, int(sp.get('lesson')) || 0));
   send(res, 200, {
     lesson, done: q('SELECT lesson, MAX(subject) subject FROM marks WHERE tutor_id=? AND date=? GROUP BY lesson').all(t.id, date),
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
@@ -912,7 +912,7 @@ route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
   const t = tutorOf(c, p.tok), date = isDate(b.date) ? b.date : today();
   const s = q('SELECT id FROM students WHERE id=? AND class_id=?').get(int(b.student_id), c.id); if (!s) bad('Ученик не найден');
   const mark = MARKS.includes(b.mark) ? b.mark : 'good', ready = b.ready === false || b.ready === 0 ? 0 : 1, comment = str(b.comment, 300);
-  const lesson = Math.max(0, Math.min(12, int(b.lesson) || 0)), subject = str(b.subject, 100);
+  const lesson = Math.max(0, Math.min(999999, int(b.lesson) || 0)), subject = str(b.subject, 100);
   const help = b.help ? 1 : 0;
   if (mark === 'good' && ready && !help && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=? AND lesson=?').run(t.id, s.id, date, lesson);
   else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, lesson, subject, mark, ready, help, comment) VALUES(?,?,?,?,?,?,?,?,?,?)

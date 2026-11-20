@@ -794,3 +794,8 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .lpanel .lcom { height: 44px; font-size: 15px; }
 .lpanel .lchips { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; }
 .lpanel .chip { font-size: 14px; padding: 9px 14px; }
+.lchip { min-width: 0; padding: 12px 16px; min-height: 48px; display: flex; align-items: center; }
+.lchip span { font-size: 15px; }
+.lpick { flex-wrap: wrap; overflow: visible; gap: 8px; }
+.lchip.done span::after { content: ' ✓'; color: var(--ok); }
+.lchip.on.done span::after { color: #fff; }
