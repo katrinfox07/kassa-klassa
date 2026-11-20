@@ -636,12 +636,18 @@ function lessonView(tok, opts = {}) {
     return today[0]?.subject || subjects[0] || '';
   };
   let chosen = null;
+  const cache = {}; // дата -> ответ сервера со всеми отметками дня: переключение предметов без загрузки
   const load = async () => {
-    box.replaceChildren(h('section.card', h('p.muted', 'Загружаем…')));
     const subj = chosen || pick();
     lesson = { n: subj ? code(subj) : 0, subject: subj };
-    let d; try { d = await api('GET', `${tok}/day?date=${date}&lesson=${lesson.n}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
-    const doneN = d.done.map(x => x.lesson);
+    let d = cache[date];
+    if (!d) {
+      box.replaceChildren(h('section.card', h('p.muted', 'Загружаем…')));
+      try { d = cache[date] = await api('GET', `${tok}/day?date=${date}&lesson=${lesson.n}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
+    }
+    d.marks = d.all.filter(x => x.lesson === lesson.n);
+    const doneN = [...new Set(d.all.map(x => x.lesson))];
+    const dayCache = d;
     const list = subjects.map(x => ({ n: code(x), subject: x }));
     const byId = Object.fromEntries(d.marks.map(m => [m.student_id, m]));
     const dateIn = h('input', { type: 'date', value: date, max: localISO(), onchange: e => { date = e.target.value || localISO(); load(); } });
@@ -651,6 +657,7 @@ function lessonView(tok, opts = {}) {
     let openRow = null; // открыта всегда одна панель
     const rows = d.students.map(s => {
       const m = byId[s.id] || { mark: 'good', ready: 1, help: 0, comment: '' };
+      const L = lesson, day0 = date; // на случай быстрого переключения предмета до сохранения
       const saved = h('span.lsv');
       let timer = null;
       const save = () => {
@@ -658,7 +665,9 @@ function lessonView(tok, opts = {}) {
         drawState();
         clearTimeout(timer);
         timer = setTimeout(async () => {
-          try { await api('PUT', `${tok}/mark`, { date, lesson: lesson.n, subject: lesson.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, help: !!m.help, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
+          try { await api('PUT', `${tok}/mark`, { date: day0, lesson: L.n, subject: L.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, help: !!m.help, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat();
+            dayCache.all = dayCache.all.filter(x => !(x.lesson === L.n && x.student_id === s.id));
+            if (m.mark !== 'good' || !m.ready || m.help || m.comment) dayCache.all.push({ lesson: L.n, student_id: s.id, mark: m.mark, ready: m.ready, help: m.help, comment: m.comment }); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
           catch (e) { toast(e.message, true); }
         }, 400);
       };

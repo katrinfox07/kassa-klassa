@@ -905,6 +905,7 @@ route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
     students: q('SELECT id, name, full_name, gender FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id).map(s => ({ id: s.id, name: s.name, gender: genderOf(s) })),
     marks: q('SELECT student_id, mark, ready, help, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),
+    all: q('SELECT lesson, student_id, mark, ready, help, comment FROM marks WHERE tutor_id=? AND date=?').all(t.id, date),
   });
 }, T);
 route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
