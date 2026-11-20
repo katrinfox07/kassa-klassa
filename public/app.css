@@ -694,26 +694,34 @@ details.part summary { cursor: pointer; font-size: 14px; }
 @media (max-width: 760px) { .fp-nav { width: 34px; height: 52px; font-size: 28px; background: rgba(0,0,0,.25); } }
 @media (prefers-reduced-motion: reduce) { .fp-leaf, .fp-leaf.single { transition: none; } }
 .fp-view:has(.fp-stage.zoomed) .fp-nav { opacity: 0; pointer-events: none; }
-/* Сегодня на уроке */
-.lessons-list { display: grid; gap: 8px; }
-.lrow { border-radius: 14px; background: var(--bg); padding: 10px 12px; display: grid; gap: 8px; transition: background .25s; }
+/* Сегодня на уроке - компактно: одна строка на ребёнка */
+.ltop { display: grid; gap: 8px; }
+.ltop h3 { margin: 0; }
+.ltop input[type=date] { width: auto; height: 36px; min-height: 0; padding: 4px 8px; font-size: 14px; }
+.llegend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.lessons-list { display: grid; gap: 0; padding: 4px 8px; }
+.lrow { padding: 5px 4px; border-bottom: 1px solid var(--line); border-radius: 0; transition: background .2s; }
+.lrow:last-child { border-bottom: 0; }
 .lrow[data-mark="star"] { background: var(--ok-soft); }
 .lrow[data-mark="note"] { background: var(--warn-soft); }
-.lhead { display: flex; justify-content: space-between; align-items: center; }
-.lname { font-size: 15px; }
-.lsv { color: var(--ok); font-weight: 800; font-size: 13px; }
-.lctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.lseg { display: inline-flex; background: var(--card); border-radius: 12px; padding: 3px; gap: 2px; }
-.lbtn { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 9px; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; }
-.lbtn.on.good { background: var(--accent-soft); color: var(--accent); }
-.lbtn.on.star { background: var(--ok); color: #fff; }
-.lbtn.on.note { background: var(--warn); color: #fff; }
-.lready { border: 0; font: inherit; font-size: 13px; font-weight: 700; padding: 7px 10px; border-radius: 10px; background: var(--card); color: var(--muted); cursor: pointer; }
-.lready.off { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1.5px var(--warn); }
-.lextra { display: none; gap: 6px; }
-.lrow.open .lextra, .lrow:focus-within .lextra { display: grid; }
-.lcom { min-height: 0; height: 36px; font-size: 14px; }
-.lchips, .jsum { display: flex; flex-wrap: wrap; gap: 5px; }
+.lmain { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 4px; }
+.lname { font-size: 14.5px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; }
+.lsv { color: var(--ok); font-weight: 800; font-size: 12px; margin-left: 4px; }
+.lseg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 2px; gap: 1px; }
+.lbtn { border: 0; background: transparent; font: inherit; font-size: 17px; line-height: 1; width: 36px; height: 32px; border-radius: 8px; cursor: pointer; opacity: .45; filter: grayscale(.6); transition: background .2s, opacity .2s; }
+.lbtn.on { opacity: 1; filter: none; }
+.lbtn.on.good { background: var(--accent-soft); }
+.lbtn.on.star { background: var(--ok); }
+.lbtn.on.note { background: var(--warn); }
+.lready, .lpen { border: 0; font: inherit; font-size: 16px; width: 34px; height: 32px; border-radius: 8px; background: var(--bg); cursor: pointer; opacity: .4; filter: grayscale(.7); color: var(--text); }
+.lready.off { opacity: 1; filter: none; background: var(--warn-soft); box-shadow: inset 0 0 0 1.5px var(--warn); }
+.lrow.open .lpen { opacity: 1; filter: none; }
+.lextra { display: none; gap: 5px; padding-top: 5px; }
+.lrow.open .lextra { display: grid; }
+.lextra .lchips { display: none; }
+.lextra:focus-within .lchips { display: flex; }
+.lcom { min-height: 0; height: 32px; font-size: 13.5px; padding: 4px 10px; }
+.lchips { flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; } .lchips .chip { flex: none; } .jsum { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { border: 0; font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--card); color: var(--text); cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
 .chip.on { background: var(--grad); color: #fff; box-shadow: none; }
 .jlist { display: grid; gap: 6px; margin-top: 8px; }
@@ -722,7 +730,7 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .jpill { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
 .jpill.star { background: var(--ok-soft); color: var(--ok); } .jpill.note { background: var(--warn-soft); color: var(--warn); } .jpill.ready { background: var(--card); color: var(--muted); }
 .jitems { margin-top: 6px; display: grid; gap: 6px; } .jitems li { font-size: 14px; }
-@media (max-width: 420px) { .lbtn { padding: 6px 7px; font-size: 12.5px; } }
+@media (max-width: 380px) { .lbtn { width: 32px; } .lready, .lpen { width: 30px; } .lname { font-size: 13.5px; } }
 .tutor { background: var(--bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; }
 .tutor input.small { font-size: 13px; }
 .pin-card { max-width: 380px; margin: 12px auto; text-align: center; }
@@ -731,3 +739,8 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .pin-err { color: var(--bad, #d33); min-height: 1.3em; margin: 8px 0; font-weight: 600; }
 .tpin { font-size: 20px; letter-spacing: 4px; }
 .pin-card h3 { justify-content: center; text-align: center; }
+.lpick { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: none; }
+.lchip { flex: none; border: 0; font: inherit; display: grid; gap: 1px; text-align: left; padding: 8px 12px; border-radius: 12px; background: var(--bg); color: var(--text); cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); min-width: 92px; }
+.lchip b { font-size: 12px; color: var(--muted); } .lchip span { font-weight: 700; font-size: 14px; } .lchip small { font-size: 11.5px; color: var(--muted); }
+.lchip.done b::after { content: ' ✓'; color: var(--ok); }
+.lchip.on { background: var(--grad); color: #fff; box-shadow: none; } .lchip.on b, .lchip.on small { color: rgba(255,255,255,.85); } .lchip.on.done b::after { color: #fff; }

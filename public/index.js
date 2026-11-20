@@ -52,7 +52,7 @@ async function load() {
 
 function show(id) {
   const m = $('#main');
-  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`));
+  if (id === 'урок') m.replaceChildren(lessonView(`/api/t/${TUTOR}`, { info: S.info, subject: TU?.subject }));
   if (id === 'журнал') m.replaceChildren(journalView(`/api/t/${TUTOR}/journal`, S.students));
   if (id === 'сборы') m.replaceChildren(collectionsView());
   if (id === 'расходы') m.replaceChildren(expensesView());
@@ -128,7 +128,7 @@ function payDialog(c) {
       try {
         const image = file.files[0] ? await compressImage(file.files[0]) : null;
         await api('POST', '/api/report-payment', { collection_id: c.id, student_id: sel.value, amount: amount.value, image });
-        close(); toast('Спасибо! Казначей подтвердит оплату.'); if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';
+        close(); toast('Спасибо! Администратор подтвердит оплату.'); if (SLUG) $('#adminlink').href = '/c/' + SLUG + '/admin';
 load();
       } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = 'Отправить'; }
     },
@@ -184,7 +184,7 @@ function rosterView() {
       try { ROSTER = (await api('POST', '/api/roster', { code })).students; try { localStorage.setItem('roster-' + SLUG, code); } catch { } draw(); }
       catch (e) { if (inp.isConnected) toast(e.message, true); try { localStorage.removeItem('roster-' + SLUG); } catch { } }
     };
-    box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Здесь ФИО детей, даты рождения и телефоны родителей. Введите код класса - его знает казначей и присылает в чат класса.'),
+    box.replaceChildren(h('h3', 'Список класса'), h('p.small.muted', 'Здесь ФИО детей, даты рождения и телефоны родителей. Введите код класса - его знает администратор и присылает в чат класса.'),
       h('form.row', { onsubmit: e => { e.preventDefault(); go(inp.value.trim()); } }, inp, h('button.btn.primary', { type: 'submit' }, 'Открыть')));
     let saved = null; try { saved = localStorage.getItem('roster-' + SLUG); } catch { }
     if (saved) go(saved);

@@ -1,5 +1,5 @@
 'use strict';
-// «Касса класса» - сервис для казначеев: много классов на одном сайте.
+// «Касса класса» - сервис для администраторов: много классов на одном сайте.
 // Node 22.13+, встроенный SQLite, без внешних зависимостей.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -71,7 +71,7 @@ CREATE INDEX IF NOT EXISTS i_exp ON expenses(class_id);
 const q = (sql) => db.prepare(sql);
 db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
 const getSettingRaw = k => q('SELECT value FROM meta WHERE key=?').get(k)?.value;
-// миграция: полные данные ученика (видны только казначею)
+// миграция: полные данные ученика (видны только администратору)
 for (const col of ['full_name', 'birth', 'parent', 'phone']) {
   try { db.exec(`ALTER TABLE students ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`); } catch {}
 }
@@ -101,6 +101,14 @@ if (!getSettingRaw('mig_short_dash')) {
     for (const col of cols) db.exec(`UPDATE ${t} SET ${col}=replace(${col}, char(8212), char(8211)) WHERE instr(${col}, char(8212)) > 0`);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_short_dash', '1')").run();
 }
+// «казначей» -> «администратор» в сохранённых текстах (просьба 20.11)
+if (!getSettingRaw('mig_admin_word')) {
+  const pairs = [["казначеями", "администраторами"], ["казначеях", "администраторах"], ["казначеям", "администраторам"], ["казначеем", "администратором"], ["казначеев", "администраторов"], ["казначея", "администратора"], ["казначею", "администратору"], ["казначее", "администраторе"], ["казначеи", "администраторы"], ["казначей", "администратор"]];
+  const all = pairs.flatMap(([a, b]) => [[a, b], [a[0].toUpperCase() + a.slice(1), b[0].toUpperCase() + b.slice(1)]]);
+  for (const [t, cols] of [['collections', ['title', 'description']], ['expenses', ['title', 'note']], ['payments', ['note']], ['class_settings', ['value']], ['classes', ['title']]])
+    for (const col of cols) for (const [a, b] of all) q(`UPDATE ${t} SET ${col}=replace(${col}, ?, ?) WHERE instr(${col}, ?) > 0`).run(a, b, a);
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_admin_word', '1')").run();
+}
 if (!getSettingRaw('mig_photo_separate')) {
   db.exec("UPDATE collections SET separate=1 WHERE title='Фотографии' AND description LIKE '1 фото - 450%'");
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_photo_separate', '1')").run();
@@ -116,7 +124,7 @@ if (!getSettingRaw('mig_5g_fix')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_fix', '1')").run();
 }
-// 5Г: вернуть ссылку Сбера рядом с Т-Банком во «Взносе в фонд класса» (просьба казначея)
+// 5Г: вернуть ссылку Сбера рядом с Т-Банком во «Взносе в фонд класса» (просьба администратора)
 if (!getSettingRaw('mig_5g_sber')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const k = cl && q("SELECT id, pay_link FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
@@ -124,7 +132,7 @@ if (!getSettingRaw('mig_5g_sber')) {
   if (k && !k.pay_link.includes(SBER)) q('UPDATE collections SET pay_link=? WHERE id=?').run([SBER, ...k.pay_link.split(/\s+/).filter(Boolean)].join('\n'), k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_sber', '1')").run();
 }
-// 5Г: добавить ссылку Озон Банка во «Взнос в фонд класса» (просьба казначея)
+// 5Г: добавить ссылку Озон Банка во «Взнос в фонд класса» (просьба администратора)
 if (!getSettingRaw('mig_5g_ozon')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const k = cl && q("SELECT id, pay_link FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
@@ -132,14 +140,14 @@ if (!getSettingRaw('mig_5g_ozon')) {
   if (k && !k.pay_link.includes(OZON)) q('UPDATE collections SET pay_link=? WHERE id=?').run([...k.pay_link.split(/\s+/).filter(Boolean), OZON].join('\n'), k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon', '1')").run();
 }
-// 5Г: оставить только ссылку Озон Банка (перевод по СБП из любого банка) - просьба казначея
+// 5Г: оставить только ссылку Озон Банка (перевод по СБП из любого банка) - просьба администратора
 if (!getSettingRaw('mig_5g_ozon_only')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const k = cl && q("SELECT id FROM collections WHERE class_id=? AND title='Взнос в фонд класса'").get(cl.id);
   if (k) q('UPDATE collections SET pay_link=? WHERE id=?').run('https://finance.ozon.ru/apps/sbp/ozonbankpay/7ddcbd0b-e5b6-4953-a318-7070a275bace', k.id);
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_ozon_only', '1')").run();
 }
-// 5Г: убрать почту классного руководителя (просьба казначея)
+// 5Г: убрать почту классного руководителя (просьба администратора)
 if (!getSettingRaw('mig_5g_noemail')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -150,7 +158,7 @@ if (!getSettingRaw('mig_5g_noemail')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_noemail', '1')").run();
 }
-// 5Г: день рождения классного руководителя - 12 ноября (со слов казначея)
+// 5Г: день рождения классного руководителя - 12 ноября (со слов администратора)
 if (!getSettingRaw('mig_5g_klbday')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -161,7 +169,7 @@ if (!getSettingRaw('mig_5g_klbday')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_klbday', '1')").run();
 }
-// код для списка класса: каждому классу случайный, казначей видит и меняет его в «Настройках»
+// код для списка класса: каждому классу случайный, администратор видит и меняет его в «Настройках»
 if (!getSettingRaw('mig_list_code')) {
   for (const r of q("SELECT class_id, value FROM class_settings WHERE key='class'").all()) {
     const v = JSON.parse(r.value || '{}');
@@ -169,14 +177,14 @@ if (!getSettingRaw('mig_list_code')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_list_code', '1')").run();
 }
-// 5Г: список класса открыт родителям без кода (решение казначея)
+// 5Г: список класса открыт родителям без кода (решение администратора)
 if (!getSettingRaw('mig_5g_open_list')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='class'").get(cl.id);
   if (row) { const v = JSON.parse(row.value || '{}'); v.listCode = ''; q("UPDATE class_settings SET value=? WHERE class_id=? AND key='class'").run(JSON.stringify(v), cl.id); }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_open_list', '1')").run();
 }
-// 5Г: после 4 урока - столовая, перекус (со слов казначея)
+// 5Г: после 4 урока - столовая, перекус (со слов администратора)
 if (!getSettingRaw('mig_5g_lunch')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -187,7 +195,7 @@ if (!getSettingRaw('mig_5g_lunch')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_lunch', '1')").run();
 }
-// 5Г: телефон классного руководителя (со слов казначея)
+// 5Г: телефон классного руководителя (со слов администратора)
 if (!getSettingRaw('mig_5g_klphone')) {
   const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   const row = cl && q("SELECT value FROM class_settings WHERE class_id=? AND key='info'").get(cl.id);
@@ -437,7 +445,7 @@ route('GET', '/public', (req, res, b, p, u, c) => send(res, 200, classState(c, f
 route('POST', '/roster', (req, res, b, p, u, c) => {
   rate(req, 'roster', 20, 600e3);
   const code = getSetting(c.id, 'class', {}).listCode || '';
-  if (code && str(b.code, 40).toLowerCase() !== code.toLowerCase()) bad('Неверный код. Спросите его у казначея в чате класса.');
+  if (code && str(b.code, 40).toLowerCase() !== code.toLowerCase()) bad('Неверный код. Спросите его у администратора в чате класса.');
   send(res, 200, { students: q('SELECT name, full_name, birth, parent, phone FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id) });
 }, { cls: true });
 route('POST', '/report-payment', async (req, res, b, p, u, c) => {
@@ -460,11 +468,11 @@ route('POST', '/report-payment', async (req, res, b, p, u, c) => {
     ts: Date.now(), url: '/c/' + c.slug + '/admin#проверить' }).catch(() => {});
 }, { cls: true });
 
-// --- Кабинет казначея (только хозяин класса или владелец сервиса) ---
+// --- Кабинет администратора (только хозяин класса или владелец сервиса) ---
 const A = { cls: true, admin: true };
 const W = { cls: true, admin: true, write: true }; // запись: только при действующей подписке
 
-// --- Уведомления на телефон казначею (Web Push, без сторонних библиотек) ---
+// --- Уведомления на телефон администратору (Web Push, без сторонних библиотек) ---
 db.exec(`CREATE TABLE IF NOT EXISTS push_subs (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
   endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
 const b64u = buf => Buffer.from(buf).toString('base64url');
@@ -847,7 +855,7 @@ if (!getSettingRaw('mig_5g_head')) {
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_head', '1')").run();
 }
 ensurePins();
-// 5Г: ПИН классрука 4470 (по просьбе казначея 20.11)
+// 5Г: ПИН классрука 4470 (по просьбе администратора 20.11)
 if (!getSettingRaw('mig_5g_headpin')) {
   const c5 = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
   if (c5) {
@@ -856,17 +864,28 @@ if (!getSettingRaw('mig_5g_headpin')) {
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_headpin', '1')").run();
 }
+// отметки привязаны к уроку: номер урока + предмет (у одного учителя бывает 2 урока в день)
+if (!/lesson/.test(q("SELECT sql FROM sqlite_master WHERE name='marks'").get().sql)) {
+  db.exec(`BEGIN; CREATE TABLE marks_new (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    tutor_id INTEGER NOT NULL REFERENCES tutors(id) ON DELETE CASCADE, student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    date TEXT NOT NULL, lesson INTEGER NOT NULL DEFAULT 0, subject TEXT NOT NULL DEFAULT '', mark TEXT NOT NULL DEFAULT 'good', ready INTEGER NOT NULL DEFAULT 1, comment TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(tutor_id, student_id, date, lesson));
+  INSERT INTO marks_new(id, class_id, tutor_id, student_id, date, mark, ready, comment, updated_at) SELECT id, class_id, tutor_id, student_id, date, mark, ready, comment, updated_at FROM marks;
+  DROP TABLE marks; ALTER TABLE marks_new RENAME TO marks; COMMIT;`);
+}
 const MARKS = ['good', 'star', 'note'];
 const newToken = () => crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
-const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у казначея класса.'); return t; };
+const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у администратора класса.'); return t; };
 const T = { cls: true };
 route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/day', (req, res, b, p, u, c) => {
   rate(req, 'tutor', 300, 60e3);
-  const t = tutorOf(c, p.tok), date = isDate(new URL(req.url, 'http://x').searchParams.get('date')) ? new URL(req.url, 'http://x').searchParams.get('date') : today();
+  const sp = new URL(req.url, 'http://x').searchParams;
+  const t = tutorOf(c, p.tok), date = isDate(sp.get('date')) ? sp.get('date') : today(), lesson = Math.max(0, Math.min(12, int(sp.get('lesson')) || 0));
   send(res, 200, {
+    lesson, done: q('SELECT DISTINCT lesson FROM marks WHERE tutor_id=? AND date=?').all(t.id, date).map(r => r.lesson),
     tutor: { name: t.name, subject: t.subject, head: !!t.head }, date,
     students: q('SELECT id, name FROM students WHERE class_id=? AND active=1 ORDER BY sort, name').all(c.id),
-    marks: q('SELECT student_id, mark, ready, comment FROM marks WHERE tutor_id=? AND date=?').all(t.id, date),
+    marks: q('SELECT student_id, mark, ready, comment FROM marks WHERE tutor_id=? AND date=? AND lesson=?').all(t.id, date, lesson),
   });
 }, T);
 route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
@@ -874,16 +893,17 @@ route('PUT', '/t/(?<tok>[A-Za-z0-9]{8,20})/mark', (req, res, b, p, u, c) => {
   const t = tutorOf(c, p.tok), date = isDate(b.date) ? b.date : today();
   const s = q('SELECT id FROM students WHERE id=? AND class_id=?').get(int(b.student_id), c.id); if (!s) bad('Ученик не найден');
   const mark = MARKS.includes(b.mark) ? b.mark : 'good', ready = b.ready === false || b.ready === 0 ? 0 : 1, comment = str(b.comment, 300);
-  if (mark === 'good' && ready && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=?').run(t.id, s.id, date);
-  else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, mark, ready, comment) VALUES(?,?,?,?,?,?,?)
-    ON CONFLICT(tutor_id, student_id, date) DO UPDATE SET mark=excluded.mark, ready=excluded.ready, comment=excluded.comment, updated_at=datetime('now')`).run(c.id, t.id, s.id, date, mark, ready, comment);
+  const lesson = Math.max(0, Math.min(12, int(b.lesson) || 0)), subject = str(b.subject, 100);
+  if (mark === 'good' && ready && !comment) q('DELETE FROM marks WHERE tutor_id=? AND student_id=? AND date=? AND lesson=?').run(t.id, s.id, date, lesson);
+  else q(`INSERT INTO marks(class_id, tutor_id, student_id, date, lesson, subject, mark, ready, comment) VALUES(?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(tutor_id, student_id, date, lesson) DO UPDATE SET subject=excluded.subject, mark=excluded.mark, ready=excluded.ready, comment=excluded.comment, updated_at=datetime('now')`).run(c.id, t.id, s.id, date, lesson, subject, mark, ready, comment);
   send(res, 200, { ok: true });
 }, T);
 // классный руководитель по своей ссылке видит отметки всех учителей
 const marksRange = (c, sp) => {
   const to = isDate(sp.get('to')) ? sp.get('to') : today(), from = isDate(sp.get('from')) ? sp.get('from') : to;
-  return { from, to, marks: q(`SELECT m.date, m.mark, m.ready, m.comment, m.student_id, t.name tutor, t.subject FROM marks m JOIN tutors t ON t.id=m.tutor_id
-    WHERE m.class_id=? AND m.date BETWEEN ? AND ? ORDER BY m.date DESC, t.subject, t.name`).all(c.id, from, to) };
+  return { from, to, marks: q(`SELECT m.date, m.lesson, m.mark, m.ready, m.comment, m.student_id, t.name tutor, COALESCE(NULLIF(m.subject, ''), t.subject) subject FROM marks m JOIN tutors t ON t.id=m.tutor_id
+    WHERE m.class_id=? AND m.date BETWEEN ? AND ? ORDER BY m.date DESC, m.lesson, t.name`).all(c.id, from, to) };
 };
 route('GET', '/t/(?<tok>[A-Za-z0-9]{8,20})/journal', (req, res, b, p, u, c) => {
   rate(req, 'tutor', 300, 60e3);
@@ -1035,7 +1055,7 @@ const server = http.createServer(async (req, res) => {
       const c = q('SELECT slug, title FROM classes WHERE slug=?').get(mm[1]); if (!c) return fail(res, 404, 'Не найдено');
       const admin = url.searchParams.get('admin') === '1', teacher = url.searchParams.get('t') === '1';
       if (teacher) return sendManifest(res, { name: 'Учитель: ' + c.title, short: c.title, start: `/c/${c.slug}/uchitel`, id: `/c/${c.slug}/uchitel` });
-      return sendManifest(res, { name: (admin ? 'Казначей: ' : 'Касса: ') + c.title, short: admin ? 'Казначей' : 'Касса класса', start: `/c/${c.slug}${admin ? '/admin' : ''}`, id: `/c/${c.slug}${admin ? '/admin' : ''}` });
+      return sendManifest(res, { name: (admin ? 'Администратор: ' : 'Касса: ') + c.title, short: admin ? 'Администратор' : 'Касса класса', start: `/c/${c.slug}${admin ? '/admin' : ''}`, id: `/c/${c.slug}${admin ? '/admin' : ''}` });
     }
     // страница классрука убрана: всё на общей странице учителя с ПИН-кодом
     const um = /^\/c\/([a-z0-9-]+)\/klassruk\/?$/.exec(p);
@@ -1047,7 +1067,7 @@ const server = http.createServer(async (req, res) => {
       const isAdm = cm[2] === '/admin', isT = cm[2] === '/uchitel';
       const html = fs.readFileSync(path.join(PUBLIC_DIR, isAdm ? 'admin.html' : 'index.html'), 'utf8')
         .replace('<!--HEAD-->', cm[2]?.startsWith('/t/') ? '' : `<link rel="manifest" href="/c/${c.slug}/manifest.webmanifest${isAdm ? '?admin=1' : isT ? '?t=1' : ''}">`)
-        .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Казначей · ' + c.title : c.title)}</title>`);
+        .replace(/<title>[^<]*<\/title>/, `<title>${esc(isAdm ? 'Администратор · ' + c.title : c.title)}</title>`);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end(html);
     }

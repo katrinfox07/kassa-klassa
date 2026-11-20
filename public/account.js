@@ -32,7 +32,7 @@ function authView(mode) {
       } catch (err) { toast(err.message, true); btn.disabled = false; }
     },
   },
-    h('h2', mode === 'up' ? 'Регистрация казначея' : 'Вход для казначея'),
+    h('h2', mode === 'up' ? 'Регистрация администратора' : 'Вход для администратора'),
     mode === 'up' ? h('p.hint', `Первые ${ME?.trialDays || 30} дней бесплатно, дальше ${rub(ME?.price || 399)} в год за класс. Родителям регистрироваться не нужно.`) : null,
     mode === 'up' ? h('label.field', 'Имя', name) : null,
     h('label.field', 'Почта', email),

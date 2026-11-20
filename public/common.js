@@ -100,7 +100,7 @@ function tabs(el, list, onChange) {
   pick(list.some(t => t.id === cur) ? cur : list[0].id);
 }
 
-// участвует ли ребёнок в сборе (казначей может снять галочку)
+// участвует ли ребёнок в сборе (администратор может снять галочку)
 const inColl = (c, s) => !(c.skip || []).includes(s.id);
 function statusOf(st, collection, studentId) {
   const ps = st.payments.filter(p => p.collection_id === collection.id && p.student_id === studentId);
@@ -119,7 +119,7 @@ function progress(c) {
   return h('div.progress', { title: pct + '%' }, h('div', { style: `width:${pct}%` }));
 }
 
-// Информационный раздел: одинаковый вид для родителей и предпросмотра у казначея
+// Информационный раздел: одинаковый вид для родителей и предпросмотра у администратора
 function renderInfo(info) {
   const wrap = h('div.stack');
   if (info.announcements?.length) wrap.append(h('section.card', h('h3', 'Объявления'),
@@ -583,12 +583,37 @@ const PHRASES = {
   ready: ['Нет учебника', 'Нет тетради', 'Не сделано домашнее задание', 'Нет формы'],
 };
 // страница учителя «Сегодня на уроке»: tok - личный код учителя
-function lessonView(tok) {
+// уроки дня по расписанию класса: [{n, subject, start, end}]
+function lessonsFor(info, dateStr) {
+  const bells = info?.bells || [], days = (info?.timetable || []).filter(d => d.day);
+  const names = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+  const wd = names[new Date(dateStr + 'T12:00').getDay()];
+  const day = days.find(d => d.day.trim().toLowerCase() === wd);
+  if (day) return day.lessons.split('\n').map((x, i) => ({ n: i + 1, subject: x.trim(), start: bells[i]?.start, end: bells[i]?.end }))
+    .filter(l => l.subject && !/^[-\u2013\u2014]+$/.test(l.subject));
+  const cnt = days.length ? 0 : (bells.length || 7);
+  return Array.from({ length: cnt }, (_, i) => ({ n: i + 1, subject: '', start: bells[i]?.start, end: bells[i]?.end }));
+}
+function lessonView(tok, opts = {}) {
   const box = h('div.stack');
-  let date = localISO();
+  let date = localISO(), lesson = null;
+  const toM = t => { const [a, b] = (t || '').split(':').map(Number); return a * 60 + b; };
+  // какой урок выбрать сразу: идущий сейчас, иначе первый по предмету учителя, иначе первый
+  const pick = list => {
+    if (!list.length) return null;
+    if (date === localISO()) {
+      const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+      const cur = list.find(l => l.start && l.end && m >= toM(l.start) - 10 && m <= toM(l.end) + 10);
+      if (cur) return cur;
+    }
+    const subj = (opts.subject || '').toLowerCase().slice(0, 4);
+    return (subj && list.find(l => l.subject.toLowerCase().startsWith(subj))) || list[0];
+  };
   const load = async () => {
     box.replaceChildren(h('section.card', h('p.muted', 'Загружаем…')));
-    let d; try { d = await api('GET', `${tok}/day?date=${date}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
+    const list = lessonsFor(opts.info, date);
+    if (!lesson || !list.some(l => l.n === lesson.n)) lesson = pick(list) || { n: 0, subject: '' };
+    let d; try { d = await api('GET', `${tok}/day?date=${date}&lesson=${lesson.n}`); } catch (e) { box.replaceChildren(h('section.card', h('p', e.message))); return; }
     const byId = Object.fromEntries(d.marks.map(m => [m.student_id, m]));
     const dateIn = h('input', { type: 'date', value: date, max: localISO(), onchange: e => { date = e.target.value || localISO(); load(); } });
     const stat = h('span.small.muted');
@@ -601,7 +626,7 @@ function lessonView(tok) {
       const save = () => {
         clearTimeout(timer);
         timer = setTimeout(async () => {
-          try { await api('PUT', `${tok}/mark`, { date, student_id: s.id, mark: m.mark, ready: !!m.ready, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
+          try { await api('PUT', `${tok}/mark`, { date, lesson: lesson.n, subject: lesson.subject, student_id: s.id, mark: m.mark, ready: !!m.ready, comment: m.comment }); byId[s.id] = { ...m, student_id: s.id }; updStat(); saved.textContent = '✓'; setTimeout(() => saved.textContent = '', 1500); }
           catch (e) { toast(e.message, true); }
         }, 400);
       };
@@ -609,22 +634,26 @@ function lessonView(tok) {
       const chips = h('div.lchips');
       const drawChips = () => {
         const list = [...(PHRASES[m.mark] || []), ...(m.ready ? [] : PHRASES.ready)];
-        chips.replaceChildren(...list.map(t => h('button.chip', { type: 'button', onclick: () => { m.comment = m.comment ? (m.comment.includes(t) ? m.comment : m.comment + '; ' + t) : t; comment.value = m.comment; save(); } }, t)));
-        row.classList.toggle('open', m.mark !== 'good' || !m.ready || !!m.comment);
+        chips.replaceChildren(...list.map(t => h('button.chip', { type: 'button', onpointerdown: e => e.preventDefault(), onclick: () => { m.comment = m.comment ? (m.comment.includes(t) ? m.comment : m.comment + '; ' + t) : t; comment.value = m.comment; save(); } }, t)));
+        row.classList.toggle('nocom', !m.comment);
+        row.classList.toggle('open', forceOpen || m.mark !== 'good' || !m.ready || !!m.comment);
       };
       const seg = h('div.lseg', Object.entries(MARK).map(([k, v]) => h('button.lbtn.' + k + (m.mark === k ? '.on' : ''), { type: 'button', onclick: e => {
         m.mark = k; seg.querySelectorAll('.lbtn').forEach(b => b.classList.toggle('on', b === e.currentTarget)); row.dataset.mark = k; drawChips(); save();
-      } }, v.icon + ' ' + v.label)));
-      const ready = h('button.lready' + (m.ready ? '' : '.off'), { type: 'button', onclick: () => { m.ready = m.ready ? 0 : 1; ready.classList.toggle('off', !m.ready); ready.textContent = m.ready ? '🎒 Готов(а) к уроку' : '🎒 Не готов(а)'; drawChips(); save(); } }, m.ready ? '🎒 Готов(а) к уроку' : '🎒 Не готов(а)');
-      const row = h('div.lrow', { 'data-mark': m.mark }, h('div.lhead', h('b.lname', s.name), saved), h('div.lctl', seg, ready), h('div.lextra', comment, chips));
+      } }, v.icon)));
+      let forceOpen = false;
+      const ready = h('button.lready' + (m.ready ? '' : '.off'), { type: 'button', title: 'Готовность к уроку', 'aria-label': 'Не готов(а) к уроку', onclick: () => { m.ready = m.ready ? 0 : 1; ready.classList.toggle('off', !m.ready); drawChips(); save(); } }, '🎒');
+      const pen = h('button.lpen', { type: 'button', title: 'Комментарий', 'aria-label': 'Комментарий', onclick: () => { forceOpen = !forceOpen || !!m.comment; drawChips(); if (row.classList.contains('open')) comment.focus(); } }, '✎');
+      const row = h('div.lrow', { 'data-mark': m.mark }, h('div.lmain', h('span.lname', s.name, saved), seg, ready, pen), h('div.lextra', comment, chips));
       drawChips();
       return row;
     });
     box.replaceChildren(
-      h('section.card', h('div.row.between', h('h3', '📝 Сегодня на уроке'), stat),
-        h('p.small.muted', `${d.tutor.name}${d.tutor.subject ? ' · ' + d.tutor.subject : ''}. У всех по умолчанию «Хорошо». Отметьте, кто особенно старался, и мягко - если были замечания. Сохраняется само.`),
-        h('label.field', 'Дата урока', dateIn),
-        h('p.hint', 'Пишите о поступке, а не о ребёнке: «отвлекался на уроке», а не «невнимательный».')),
+      h('section.card.ltop', h('div.row.between', h('h3', '📝 Сегодня на уроке'), dateIn),
+        list.length ? h('div.lpick', list.map(l => h('button.lchip' + (l.n === lesson.n ? '.on' : '') + (d.done.includes(l.n) ? '.done' : ''), { type: 'button', onclick: () => { lesson = l; load(); } },
+          h('b', l.n + ' урок'), l.subject ? h('span', l.subject) : null, l.start ? h('small', l.start) : null))) : h('p.small.muted', 'В этот день уроков по расписанию нет.'),
+        h('div.llegend', h('span', '🙂 хорошо (у всех сразу)'), h('span', '⭐ умница'), h('span', '💬 замечание'), h('span', '🎒 не готов(а)'), h('span', '✎ комментарий')),
+        h('div.row.between.small', h('span.muted', 'Сохраняется само'), stat)),
       h('section.card.lessons-list', rows));
   };
   load();
@@ -650,7 +679,7 @@ function journalView(fetchUrl, students) {
       ids.length ? h('div.jlist', ids.map(id => {
         const x = per[id];
         return h('details.jrow', h('summary', h('b', names[id] || 'Ученик'), h('span.jsum', x.star ? h('span.jpill.star', '⭐ ' + x.star) : null, x.note ? h('span.jpill.note', '💬 ' + x.note) : null, x.notReady ? h('span.jpill.ready', '🎒 ' + x.notReady) : null)),
-          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.ready ? null : ' · 🎒 не готов(а)', m.comment ? h('div.small', m.comment) : null))));
+          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + (m.lesson ? ', ' + m.lesson + ' урок' : '') + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.ready ? null : ' · 🎒 не готов(а)', m.comment ? h('div.small', m.comment) : null))));
       })) : h('p.muted', 'За этот период особых отметок нет.')));
   };
   load();

@@ -1,5 +1,5 @@
 'use strict';
-// Кабинет казначея
+// Кабинет администратора
 let S = null;
 const openColl = new Set(); // какие таблицы сборов развёрнуты
 
@@ -396,7 +396,7 @@ VIEWS['настройки'] = () => {
   return h('div.stack',
     h('section.card.form', h('h3', 'Класс'),
       h('label.field', 'Название (заголовок страницы)', f.title),
-      h('label.field', 'Казначей', f.treasurer),
+      h('label.field', 'Администратор', f.treasurer),
       h('label.field', 'Код для списка класса (необязательно; пусто - список открыт всем родителям)', f.listCode),
       h('label.field', 'Подсказка родителям при оплате', f.payHint),
       h('div.two', h('label.field', 'Остаток на начало, ₽ (входит в «Собрано»)', f.opening), h('label.field', 'Откуда остаток', f.openingNote)),
