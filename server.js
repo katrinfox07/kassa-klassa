@@ -894,7 +894,7 @@ route('POST', '/uchitel/unlock', (req, res, b, p, u, c) => {
   const t = pin.length === 4 && q('SELECT token FROM tutors WHERE class_id=? AND pin=?').get(c.id, pin);
   if (!t) {
     pinFails.set(kIp, [...recentFails(kIp, 15 * 60e3), Date.now()]); pinFails.set(kCl, [...recentFails(kCl, 60 * 60e3), Date.now()]);
-    throw new HttpError(403, 'Неверный ПИН. Его можно узнать у казначея класса.');
+    throw new HttpError(403, 'Неверный ПИН.');
   }
   send(res, 200, { token: t.token });
 }, T);

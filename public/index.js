@@ -75,7 +75,7 @@ function pinScreen(msg) {
     catch (er) { err.textContent = er.message; inp.value = ''; inp.focus(); busy = false; }
   };
   $('#main').replaceChildren(h('section.card.form.pin-card', h('div.pin-ic', '🔒'), h('h3', 'Вход для учителя'),
-    h('p.muted', 'Введите свой ПИН-код из 4 цифр. Его выдаёт казначей класса.'),
+    h('p.muted', 'Введите свой ПИН-код из 4 цифр.'),
     h('form', { onsubmit: go }, inp, err, h('button.btn.primary', { style: 'width:100%' }, 'Войти'))));
   setTimeout(() => inp.focus(), 50);
 }
