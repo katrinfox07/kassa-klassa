@@ -847,6 +847,15 @@ if (!getSettingRaw('mig_5g_head')) {
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_head', '1')").run();
 }
 ensurePins();
+// 5Г: ПИН классрука 4470 (по просьбе казначея 20.11)
+if (!getSettingRaw('mig_5g_headpin')) {
+  const c5 = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  if (c5) {
+    q("UPDATE tutors SET pin=? WHERE class_id=? AND pin='4470' AND head=0").run(newPin(c5.id), c5.id);
+    q("UPDATE tutors SET pin='4470' WHERE class_id=? AND head=1").run(c5.id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_5g_headpin', '1')").run();
+}
 const MARKS = ['good', 'star', 'note'];
 const newToken = () => crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, 'x');
 const tutorOf = (c, tok) => { const t = q('SELECT * FROM tutors WHERE class_id=? AND token=?').get(c.id, String(tok || '')); if (!t) throw new HttpError(404, 'Ссылка устарела. Попросите новую у казначея класса.'); return t; };
