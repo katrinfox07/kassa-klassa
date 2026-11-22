@@ -988,12 +988,50 @@ function convertNext() {
 for (const r of q("SELECT key FROM meta WHERE key LIKE 'tococr\\_%' ESCAPE '\\'").all()) {
   q("UPDATE books SET toc='[]' WHERE id=?").run(+r.key.slice(7)); q('DELETE FROM meta WHERE key=?').run(r.key);
 }
-// учебники без оглавления и без текста: один раз пробуем распознать страницы
-setTimeout(() => {
-  if (!HAS_OCR) return console.log('[toc-ocr] нет tesseract');
-  for (const b of q("SELECT id, toc FROM books WHERE status='ready' ORDER BY id").all())
-    if (JSON.parse(b.toc || '[]').length === 0 && !getSettingRaw('tococr2_' + b.id)) queueOcr(b.id);
-}, 15000);
+// оглавления учебников 5Г, переписанные вручную со страниц «Содержание» (22.11); печатная страница -> страница PDF
+if (!getSettingRaw('mig_toc_manual_1')) {
+  try {
+    const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+    let cur = null; const books = {};
+    for (const line of fs.readFileSync(path.join(__dirname, 'toc-ekl5g.txt'), 'utf8').split('\n')) {
+      const h = /^## (\d+) (-?\d+)/.exec(line); if (h) { cur = books[h[1]] = { d: +h[2], rows: [] }; continue; }
+      const m = /^(\d+|-)\|(.+)$/.exec(line.trim()); if (m && cur) cur.rows.push([m[1], m[2].trim()]);
+    }
+    for (const [id, bk] of Object.entries(books)) {
+      const b = cl && q('SELECT id, pages FROM books WHERE id=? AND class_id=?').get(+id, cl.id); if (!b) continue;
+      let last = 1;
+      const toc = bk.rows.map(([pr, title]) => { const printed = pr === '-' ? last : +pr; last = printed; return { title, page: Math.min(b.pages, Math.max(1, printed - bk.d)) }; });
+      q('UPDATE books SET toc=? WHERE id=?').run(JSON.stringify(toc), b.id);
+      q("INSERT OR REPLACE INTO meta(key, value) VALUES(?, '1')").run('tococr2_' + b.id);
+      console.log('[toc-manual]', id, toc.length);
+    }
+  } catch (e) { console.log('[toc-manual] error', e.message); }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_toc_manual_1', '1')").run();
+}
+// временно: распознанный текст страниц «Содержание» в лог, чтобы переписать остальные учебники вручную
+async function tocDump(id) {
+  const b = q('SELECT id, pages FROM books WHERE id=?').get(id); if (!b || !HAS_OCR) return;
+  const N = b.pages, dir = path.join(BOOK_DIR, String(id)), img = n => path.join(dir, n + '.jpg');
+  const kw = t => /(оглавлен|содержан|contents)/i.test(t.slice(0, 300));
+  const look = [...new Set([...Array(10).keys()].flatMap(k => [k, N - 1 - k]))].filter(i => i >= 0 && i < N).sort((a, b) => a - b);
+  let start = -1;
+  for (const i of look) { const t = await ocrImage(img(i + 1)); if (kw(t)) { start = i; break; } }
+  console.log('[dump]', id, 'start', start + 1);
+  const nums = async (i, strip) => new Set(((await ocrImage(img(i + 1), strip)).match(/(?<!\d)\d{1,3}(?!\d)/g) || []).map(Number));
+  const votes = {};
+  for (let k = 1; k <= 6; k++) {
+    const i = Math.floor(N * k / 7);
+    for (const strip of ['top', 'bottom']) { const a = await nums(i, strip), c = await nums(i + 1, strip); for (const n of a) if (c.has(n + 1)) { const d = n - (i + 1); votes[d] = (votes[d] || 0) + 1; } }
+  }
+  console.log('[dump]', id, 'offset votes', JSON.stringify(votes));
+  if (start < 0) return;
+  for (let i = start; i < Math.min(N, start + 4); i++) {
+    const t = await ocrImage(img(i + 1));
+    if (i > start && !/\d{1,3}\s*$/m.test(t)) break;
+    for (const l of t.split('\n').filter(x => x.trim())) console.log('[dump]', id, 'p' + (i + 1), l);
+  }
+}
+setTimeout(async () => { for (const id of [16, 6, 13, 8, 9, 10, 11, 12, 15, 7]) { try { await tocDump(id); } catch (e) { console.log('[dump] error', id, e.message); } } }, 20000);
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
 setTimeout(convertNext, 3000);
