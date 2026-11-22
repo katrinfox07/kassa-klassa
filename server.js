@@ -867,6 +867,18 @@ function convertNext() {
   pr.on('error', () => done(new Error('На сервере нет pdftoppm')));
   pr.on('close', code => done(code ? new Error('PDF не открылся (код ' + code + ')') : null));
 }
+// диагностика оглавления (в логи сервера, временно)
+setTimeout(() => {
+  for (const b of q("SELECT id, title, pages, toc FROM books").all()) {
+    let pages = null; try { pages = JSON.parse(fs.readFileSync(path.join(BOOK_DIR, String(b.id), 'text.json'), 'utf8')); } catch {}
+    if (!pages) { console.log('[tocdiag]', b.id, b.title, 'NO TEXT'); continue; }
+    const lens = pages.map(t => t.replace(/\s/g, '').length);
+    const cyr = pages.map(t => (t.match(/[а-яё]/gi) || []).length);
+    const toc = findToc(pages);
+    console.log('[tocdiag]', b.id, b.title, 'pages', pages.length, 'chars', lens.reduce((a, x) => a + x, 0), 'cyr', cyr.reduce((a, x) => a + x, 0), 'found', toc.length, 'saved', JSON.parse(b.toc || '[]').length);
+    if (b.id === 3) for (const i of [pages.length - 1, pages.length - 2, 2]) console.log('[tocdiag] p' + (i + 1) + ' ' + JSON.stringify(pages[i].slice(0, 1500)));
+  }
+}, 8000);
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
 setTimeout(convertNext, 3000);
