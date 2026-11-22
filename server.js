@@ -989,7 +989,7 @@ for (const r of q("SELECT key FROM meta WHERE key LIKE 'tococr\\_%' ESCAPE '\\'"
   q("UPDATE books SET toc='[]' WHERE id=?").run(+r.key.slice(7)); q('DELETE FROM meta WHERE key=?').run(r.key);
 }
 // оглавления учебников 5Г, переписанные вручную со страниц «Содержание» (22.11); печатная страница -> страница PDF
-if (!getSettingRaw('mig_toc_manual_1')) {
+if (!getSettingRaw('mig_toc_manual_2')) {
   try {
     const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
     let cur = null; const books = {};
@@ -1006,32 +1006,8 @@ if (!getSettingRaw('mig_toc_manual_1')) {
       console.log('[toc-manual]', id, toc.length);
     }
   } catch (e) { console.log('[toc-manual] error', e.message); }
-  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_toc_manual_1', '1')").run();
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_toc_manual_2', '1')").run();
 }
-// временно: распознанный текст страниц «Содержание» в лог, чтобы переписать остальные учебники вручную
-async function tocDump(id) {
-  const b = q('SELECT id, pages FROM books WHERE id=?').get(id); if (!b || !HAS_OCR) return;
-  const N = b.pages, dir = path.join(BOOK_DIR, String(id)), img = n => path.join(dir, n + '.jpg');
-  const kw = t => /(оглавлен|содержан|contents)/i.test(t.slice(0, 300));
-  const look = [...new Set([...Array(10).keys()].flatMap(k => [k, N - 1 - k]))].filter(i => i >= 0 && i < N).sort((a, b) => a - b);
-  let start = -1;
-  for (const i of look) { const t = await ocrImage(img(i + 1)); if (kw(t)) { start = i; break; } }
-  console.log('[dump]', id, 'start', start + 1);
-  const nums = async (i, strip) => new Set(((await ocrImage(img(i + 1), strip)).match(/(?<!\d)\d{1,3}(?!\d)/g) || []).map(Number));
-  const votes = {};
-  for (let k = 1; k <= 6; k++) {
-    const i = Math.floor(N * k / 7);
-    for (const strip of ['top', 'bottom']) { const a = await nums(i, strip), c = await nums(i + 1, strip); for (const n of a) if (c.has(n + 1)) { const d = n - (i + 1); votes[d] = (votes[d] || 0) + 1; } }
-  }
-  console.log('[dump]', id, 'offset votes', JSON.stringify(votes));
-  if (start < 0) return;
-  for (let i = start; i < Math.min(N, start + 4); i++) {
-    const t = await ocrImage(img(i + 1));
-    if (i > start && !/\d{1,3}\s*$/m.test(t)) break;
-    for (const l of t.split('\n').filter(x => x.trim())) console.log('[dump]', id, 'p' + (i + 1), l);
-  }
-}
-setTimeout(async () => { for (const id of [16, 6, 13, 8, 9, 10, 11, 12, 15, 7]) { try { await tocDump(id); } catch (e) { console.log('[dump] error', id, e.message); } } }, 20000);
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
 setTimeout(convertNext, 3000);
