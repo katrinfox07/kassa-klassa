@@ -1066,11 +1066,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS stars (id INTEGER PRIMARY KEY, class_id INTE
   peer_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
 const STAR_DEFAULTS = {
   rewards: [
-    { price: 5, title: 'Выбрать место на день (у окна или с другом)' },
+    { price: 5, title: 'Сидеть с другом 1 день' },
+    { price: 6, title: 'Именная наклейка на тетрадь' },
     { price: 8, title: 'Помощник учителя на уроке' },
-    { price: 10, title: 'Пропустить одно дежурство (по согласию классрука)' },
+    { price: 10, title: 'Выбрать место в классе на неделю' },
+    { price: 12, title: 'Отмена 1 домашнего задания (по согласию учителя)' },
     { price: 15, title: 'Второй шанс на проверочную (по согласию учителя)' },
-    { price: 20, title: '+1 балл к оценке (по согласию учителя)' },
+    { price: 20, title: '+1 балл к оценке по русскому языку или литературе' },
   ],
   map: [
     { steps: 100, icon: '🌳', title: 'Урок на улице' },
@@ -1083,6 +1085,14 @@ const STAR_DEFAULTS = {
 const RANKS = [[0, 'Новичок', '🌱'], [10, 'Искатель', '🧭'], [30, 'Мастер', '🛡'], [60, 'Легенда', '👑']];
 const weekStart = d => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() - (x.getUTCDay() + 6) % 7); return x.toISOString().slice(0, 10); };
 const dayShift = (d, n) => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+// новый список личных наград (её примеры), 22.11
+if (!getSettingRaw('mig_rewards_2211')) {
+  for (const r of q("SELECT class_id, value FROM class_settings WHERE key='stars'").all()) {
+    const v = JSON.parse(r.value || '{}'); v.rewards = STAR_DEFAULTS.rewards;
+    q("UPDATE class_settings SET value=? WHERE class_id=? AND key='stars'").run(JSON.stringify(v), r.class_id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_rewards_2211', '1')").run();
+}
 function starsState(c, full) {
   const set = getSetting(c.id, 'stars', {});
   const rewards = set.rewards || STAR_DEFAULTS.rewards, map = set.map || STAR_DEFAULTS.map;

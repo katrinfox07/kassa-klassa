@@ -777,7 +777,10 @@ function expeditionView(d) {
     h('div.ex-track', h('div.ex-fill', { style: `width:${pct}%` }), map.map(x => h('span.ex-pt' + (x.steps <= steps ? '.got' : ''), { style: `left:${Math.min(100, x.steps / max * 100)}%`, title: x.title }, x.icon))),
     h('ul.plain.ex-stops', map.map(x => h('li' + (x.steps <= steps ? '.got' : ''), h('span.ex-ic', x.icon), h('span.grow', x.title), h('span.small.muted', x.steps <= steps ? 'получено ✓' : x.steps + ' шагов')))),
     d.days?.length ? h('details.more', h('summary', 'Последние дни'), h('ul.plain.ex-days', d.days.map(x => h('li', h('span.muted', fd(x.date)), ' +' + x.steps + ' шагов', x.quiet ? ' · 🌤 тихий день' : '', x.cleanWeek ? ' · ✨ чистая неделя' : '')))) : null,
-    h('p.hint', 'Как идти быстрее: стараться на уроках ⭐, помогать друг другу 🤝, приходить готовыми 🎒. Замечания шаги не отнимают.'));
+    h('p.hint', 'Как идти быстрее: стараться на уроках ⭐, помогать друг другу 🤝, приходить готовыми 🎒. Замечания шаги не отнимают.'),
+    d.rewards?.length ? h('div.ex-shop', h('h3', '🎁 Личные награды'),
+      h('p.small.muted', 'Свои звёзды каждый копит для себя и сам решает, на что их обменять. Обмен - у классного руководителя.'),
+      h('ul.plain.ex-stops', d.rewards.map(r => h('li', h('span.ex-price', '⭐ ' + r.price), h('span.grow', r.title))))) : null);
 }
 // ---------- Звёзды детей: только для классрука и администратора ----------
 function starsView(base, opts = {}) {

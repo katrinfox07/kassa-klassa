@@ -809,3 +809,5 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .rd-tocp { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .rd-tocf { height: 40px; }
 @media (max-width: 500px) { .rd-toct { display: none; } .rd-tocb { font-size: 18px; padding: 4px 12px; } }
+
+.ex-shop { margin-top: 14px; } .ex-shop h3 { margin: 0 0 4px; } .ex-price { flex: none; min-width: 52px; font-weight: 800; color: #b45309; }
