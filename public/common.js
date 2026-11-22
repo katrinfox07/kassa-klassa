@@ -559,7 +559,7 @@ function openReader(b) {
     h('div.rd-bar',
       h('button.icon-btn', { onclick: close, 'aria-label': 'Закрыть' }, '✕'),
       h('b.rd-title', b.title),
-      b.toc?.length ? h('button.btn.small.rd-tocb', { onclick: () => openToc(), 'aria-label': 'Оглавление' }, '☰', h('span.rd-toct', ' Оглавление')) : null,
+      h('button.btn.small.rd-tocb', { onclick: () => openToc(), 'aria-label': 'Оглавление' }, '☰', h('span.rd-toct', ' Оглавление')),
       h('span.rd-pg', cnt, h('span', ' / ' + N)),
       h('span.rd-zoom', h('button.icon-btn', { onclick: () => zoomAt(zoom - .5), 'aria-label': 'Мельче' }, '−'), zl,
         h('button.icon-btn', { onclick: () => zoomAt(zoom + .5), 'aria-label': 'Крупнее' }, '+'))),
@@ -567,6 +567,14 @@ function openReader(b) {
   // оглавление: список параграфов, нажатие - переход на страницу
   function openToc() {
     const old = wrap.querySelector('.rd-toc'); if (old) return old.remove();
+    if (!b.toc?.length) {
+      const admin = typeof tocDialog === 'function';
+      const empty = h('div.rd-toc', h('div.row.between', h('b', 'Оглавление'), h('button.icon-btn', { onclick: () => empty.remove(), 'aria-label': 'Закрыть оглавление' }, '✕')),
+        h('div', h('p', 'Для этого учебника оглавление ещё не добавлено.'),
+          admin ? h('p.small.muted', 'Нажмите «Добавить»: можно загрузить PDF заново (оглавление найдётся само) или вписать его вручную.') : h('p.small.muted', 'Его добавляет администратор класса.'),
+          admin ? h('button.btn.primary', { onclick: () => { close(); tocDialog(b); } }, 'Добавить оглавление') : null));
+      wrap.append(empty); return;
+    }
     const cur = [...b.toc].reverse().find(t => t.page <= page);
     const find = h('input.rd-tocf', { placeholder: 'Найти параграф', type: 'search' });
     const list = h('ul.plain.rd-tocl');
