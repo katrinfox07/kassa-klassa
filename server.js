@@ -1149,6 +1149,16 @@ route('DELETE', '/admin/tutors/:id', (req, res, b, p, u, c) => { q('DELETE FROM 
 db.exec(`CREATE TABLE IF NOT EXISTS stars (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
   student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE, amount INTEGER NOT NULL, kind TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
   peer_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+// тестовые отметки (до перехода на предметы, 20.11) - убрать; что было, пишем в лог
+if (!getSettingRaw('mig_clear_test_marks')) {
+  const cl = q("SELECT id FROM classes WHERE slug='ekl-5g'").get();
+  if (cl) {
+    for (const m of q('SELECT m.*, t.name tname FROM marks m LEFT JOIN tutors t ON t.id=m.tutor_id WHERE m.class_id=?').all(cl.id)) console.log('[marks]', JSON.stringify(m));
+    for (const x of q('SELECT * FROM stars WHERE class_id=?').all(cl.id)) console.log('[stars]', JSON.stringify(x));
+    q('DELETE FROM marks WHERE class_id=? AND lesson < 100').run(cl.id);
+  }
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_clear_test_marks', '1')").run();
+}
 const STAR_DEFAULTS = {
   rewards: [
     { price: 5, title: 'Сидеть с другом 1 день' },
