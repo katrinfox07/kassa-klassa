@@ -793,29 +793,51 @@ try { db.exec("ALTER TABLE books ADD COLUMN toc TEXT NOT NULL DEFAULT '[]'"); } 
 const { spawn } = require('node:child_process');
 // --- Оглавление: текст страниц (pdftotext) -> строки «название ..... 12» -> страницы PDF ---
 const normT = t => String(t || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9§]+/g, ' ').trim();
-function findToc(pages) {
-  const ENTRY = /^(.{3,160}?)[\s.…·_-]*?(?:\.{2,}|…|\s{2,}|\s)\s*(\d{1,3})\s*$/;
-  const isTocPage = t => /(оглавление|содержание)/i.test(t.slice(0, 400)) || t.split('\n').filter(l => ENTRY.test(l.trim())).length >= 8;
-  const N = pages.length, cand = [];
-  for (let i = 0; i < N; i++) if ((i < 20 || i >= N - 20) && isTocPage(pages[i])) cand.push(i);
-  if (!cand.length) return [];
-  // берём первую группу подряд идущих страниц содержания
-  const group = [cand[0]]; for (const i of cand.slice(1)) if (i === group[group.length - 1] + 1) group.push(i); else break;
+const TOC_ENTRY = /^(.{3,160}?)[\s.…·_-]*?(?:\.{2,}|…|\s{2,}|\s)\s*(\d{1,3})\s*$/;
+const isTocPage = t => /(оглавление|содержание|contents)/i.test(String(t).slice(0, 400)) || String(t).split('\n').filter(l => TOC_ENTRY.test(l.trim())).length >= 8;
+// строки «название ..... 12» со страниц содержания (и после распознавания картинок)
+// после распознавания: отрезаем точки-«ступеньки» и мусор за ними
+function cleanTocTitle(t) {
+  t = String(t).replace(/(\s|^)\$\s?(?=\d)/g, '$1§ ');
+  t = t.split(/\s*(?:\.{2,}|…|„|\s[.,:;_\-—‚]{2,}|\s[.‚„]\s)/)[0];
+  for (let i = 0; i < 6; i++) { const n = t.replace(/\s+(?:[a-zA-Z]{1,6}|[еаоинвзь]{3,}|\d[\d.]*\.[\d.]*|[^\sА-ЯЁа-яё\d§]+)$/, ''); if (n === t) break; t = n; }
+  t = t.replace(/^.{3,}?\s(?=§\s?\d)/, ''); // «Глава … § 1. …» -> «§ 1. …»
+  return t.replace(/[\s.,:;_\-—]+$/, '').trim();
+}
+function parseTocEntries(texts) {
   const entries = [];
-  for (const i of group) {
+  for (const text of texts) {
     let carry = '';
-    for (const raw of pages[i].split('\n')) {
+    for (const raw of String(text).split('\n')) {
       const l = raw.replace(/\s+$/, '').trim(); if (!l) { carry = ''; continue; }
-      if (/^(оглавление|содержание)$/i.test(l)) continue;
-      const m = ENTRY.exec(l);
+      if (/^(\d{1,3}\s+)?(оглавление|содержание|contents)(\s+\d{1,3})?$/i.test(l)) continue;
+      const m = TOC_ENTRY.exec(l);
       if (m) {
         let title = ((carry ? carry + ' ' : '') + m[1]).replace(/[\s.…·_-]+$/, '').replace(/\s+/g, ' ').trim();
+        title = cleanTocTitle(title);
+        title = title.replace(/^[$S§]\s?(\d{1,2})\.?\s+(?=[А-ЯЁA-Z])/, '§ $1. ').replace(/^8\s?(\d{1,2})\.?\s+(?=[А-ЯЁ]{3,}(\s|$))/, '§ $1. ')   // «$1 НАТУРАЛЬНЫЕ» -> «§ 1. НАТУРАЛЬНЫЕ»
+          .replace(/^(\d{1,2})\s+(?=[А-ЯЁA-Z][а-яёa-z])/, '$1. ')                              // «2 Цифры» -> «2. Цифры»
+          .replace(/^(Глава|Раздел|Часть)\s*[|l1]\s/i, '$1 I. ');
         const printed = +m[2];
         if (title.length >= 3 && !/^\d+$/.test(title) && !/^(глава|раздел|часть|урок|тема|§)\.?$/i.test(title) && printed > 0) entries.push({ title: title.slice(0, 150), printed });
         carry = '';
       } else carry = l.length < 90 && !/\d{1,3}$/.test(l) ? l : '';
     }
   }
+  // распознанные номера иногда ошибочны: номер, выпадающий из порядка, берём от соседа
+  for (let i = 1; i < entries.length - 1; i++) {
+    const a = entries[i - 1].printed, b = entries[i + 1].printed, x = entries[i].printed;
+    if (a <= b && (x < a || x > b)) entries[i].printed = a;
+  }
+  return entries;
+}
+function findToc(pages) {
+  const N = pages.length, cand = [];
+  for (let i = 0; i < N; i++) if ((i < 20 || i >= N - 20) && isTocPage(pages[i])) cand.push(i);
+  if (!cand.length) return [];
+  // берём первую группу подряд идущих страниц содержания
+  const group = [cand[0]]; for (const i of cand.slice(1)) if (i === group[group.length - 1] + 1) group.push(i); else break;
+  const entries = parseTocEntries(group.map(i => pages[i]));
   if (entries.length < 2) return [];
   // сдвиг: на какой странице PDF реально стоит заголовок (печатная страница + сдвиг)
   const offs = {};
@@ -831,6 +853,72 @@ function findToc(pages) {
   const off = best ? +best[0] : 0;
   return entries.map(e => ({ title: e.title, page: Math.min(N, Math.max(1, e.printed + off)) }));
 }
+// --- PDF без текста (сканы, «картинки»): распознаём страницы (tesseract) ---
+const { spawnSync } = require('node:child_process');
+const IM = ['magick', 'convert'].find(c => { try { return spawnSync(c, ['-version']).status === 0; } catch { return false; } });
+const HAS_OCR = (() => { try { return !!IM && spawnSync('tesseract', ['--version']).status === 0; } catch { return false; } })();
+function runCmd(cmd, args) {
+  return new Promise(resolve => {
+    let out = ''; const pr = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'ignore'] });
+    pr.stdout.on('data', d => { out += d; }); pr.on('error', () => resolve('')); pr.on('close', () => resolve(out));
+  });
+}
+// strip: 'top' | 'bottom' - только полоска с номером страницы
+async function ocrImage(img, strip) {
+  const tmp = img + '.ocr.png';
+  const crop = strip ? ['-gravity', strip === 'top' ? 'North' : 'South', '-crop', '100%x9%+0+0', '+repage'] : [];
+  // точки-«ступеньки» в оглавлении мешают распознаванию: убираем мелкие пятна
+  await runCmd(IM, [img, ...crop, '-resize', '200%', '-colorspace', 'Gray', '-threshold', '60%',
+    '-define', 'connected-components:area-threshold=20', '-define', 'connected-components:mean-color=true', '-connected-components', '8', tmp]);
+  const txt = fs.existsSync(tmp) ? await runCmd('tesseract', [tmp, 'stdout', '-l', 'rus+eng', '--psm', '6']) : '';
+  fs.rmSync(tmp, { force: true });
+  return txt;
+}
+async function ocrToc(id, N) {
+  if (!HAS_OCR || !N) return [];
+  const dir = path.join(BOOK_DIR, String(id)), img = n => path.join(dir, n + '.jpg');
+  const cache = {}; const ocr = async i => (cache[i] ??= fs.existsSync(img(i + 1)) ? await ocrImage(img(i + 1)) : '');
+  const look = [...new Set([...Array(12).keys()].flatMap(k => [k, N - 1 - k]))].filter(i => i >= 0 && i < N).sort((a, b) => a - b);
+  let start = -1;
+  for (const i of look) if (isTocPage(await ocr(i))) { start = i; break; }
+  if (start < 0) return [];
+  const group = [start];
+  while (group.length < 8 && group[group.length - 1] + 1 < N && isTocPage(await ocr(group[group.length - 1] + 1))) group.push(group[group.length - 1] + 1);
+  const entries = parseTocEntries(group.map(i => cache[i]));
+  if (entries.length < 2) return [];
+  // сдвиг нумерации: читаем номера страниц в верхней и нижней полоске нескольких страниц
+  const votes = {};
+  for (let k = 1; k <= 10; k++) {
+    const i = Math.floor(N * k / 11); if (group.includes(i)) continue;
+    for (const strip of ['top', 'bottom']) {
+      const nums = ((await ocrImage(img(i + 1), strip)).match(/(?<!\d)\d{1,3}(?!\d)/g) || []).map(Number);
+      for (const n of new Set(nums)) { const d = n - (i + 1); if (d >= -10 && d <= 30) votes[d] = (votes[d] || 0) + 1; }
+    }
+  }
+  const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+  const d = best && best[1] >= 3 ? +best[0] : 0;
+  return entries.map(e => ({ title: e.title, page: Math.min(N, Math.max(1, e.printed - d)) }));
+}
+// очередь распознавания: по одному учебнику, в фоне
+const ocrQueue = []; let ocrBusy = false;
+function queueOcr(id) { if (!ocrQueue.includes(id)) ocrQueue.push(id); ocrNext(); }
+async function ocrNext() {
+  if (ocrBusy || !ocrQueue.length || !HAS_OCR) return;
+  ocrBusy = true;
+  const id = ocrQueue.shift();
+  try {
+    const bk = q("SELECT id, pages, toc FROM books WHERE id=? AND status='ready'").get(id);
+    if (bk && JSON.parse(bk.toc || '[]').length === 0) {
+      const toc = await ocrToc(bk.id, bk.pages);
+      const now = q('SELECT toc FROM books WHERE id=?').get(id);
+      if (now && JSON.parse(now.toc || '[]').length === 0 && toc.length) q('UPDATE books SET toc=? WHERE id=?').run(JSON.stringify(toc), id);
+      console.log('[toc-ocr]', id, 'entries', toc.length);
+    }
+    q("INSERT OR REPLACE INTO meta(key, value) VALUES(?, '1')").run('tococr_' + id);
+  } catch (e) { console.log('[toc-ocr] error', id, e.message); }
+  ocrBusy = false; ocrNext();
+}
+const textChars = pages => (pages || []).reduce((a, t) => a + String(t).replace(/\s/g, '').length, 0);
 function extractText(pdf, out) {
   return new Promise(resolve => {
     const pr = spawn('pdftotext', ['-layout', '-enc', 'UTF-8', pdf, out], { stdio: 'ignore' });
@@ -858,6 +946,7 @@ function convertNext() {
       const old = JSON.parse(q('SELECT toc FROM books WHERE id=?').get(id)?.toc || '[]');
       const toc = old.length ? old : (pages ? findToc(pages.slice(0, files.length)) : []);
       q("UPDATE books SET status='ready', pages=?, error='', toc=? WHERE id=?").run(files.length, JSON.stringify(toc), id);
+      if (!toc.length && textChars(pages) < 50 * files.length) setTimeout(() => queueOcr(id), 100);
     } catch (e) { q("UPDATE books SET status='error', error=? WHERE id=?").run(String(e.message || e).slice(0, 200), id); }
     fs.rm(pdf, { force: true }, () => {});
     bookBusy = false; convertNext();
@@ -867,18 +956,12 @@ function convertNext() {
   pr.on('error', () => done(new Error('На сервере нет pdftoppm')));
   pr.on('close', code => done(code ? new Error('PDF не открылся (код ' + code + ')') : null));
 }
-// диагностика оглавления (в логи сервера, временно)
+// учебники без оглавления и без текста: один раз пробуем распознать страницы
 setTimeout(() => {
-  for (const b of q("SELECT id, title, pages, toc FROM books").all()) {
-    let pages = null; try { pages = JSON.parse(fs.readFileSync(path.join(BOOK_DIR, String(b.id), 'text.json'), 'utf8')); } catch {}
-    if (!pages) { console.log('[tocdiag]', b.id, b.title, 'NO TEXT'); continue; }
-    const lens = pages.map(t => t.replace(/\s/g, '').length);
-    const cyr = pages.map(t => (t.match(/[а-яё]/gi) || []).length);
-    const toc = findToc(pages);
-    console.log('[tocdiag]', b.id, b.title, 'pages', pages.length, 'chars', lens.reduce((a, x) => a + x, 0), 'cyr', cyr.reduce((a, x) => a + x, 0), 'found', toc.length, 'saved', JSON.parse(b.toc || '[]').length);
-    if (b.id === 3) for (const i of [pages.length - 1, pages.length - 2, 2]) console.log('[tocdiag] p' + (i + 1) + ' ' + JSON.stringify(pages[i].slice(0, 1500)));
-  }
-}, 8000);
+  if (!HAS_OCR) return console.log('[toc-ocr] нет tesseract');
+  for (const b of q("SELECT id, toc FROM books WHERE status='ready' ORDER BY id").all())
+    if (JSON.parse(b.toc || '[]').length === 0 && !getSettingRaw('tococr_' + b.id)) queueOcr(b.id);
+}, 15000);
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
 setTimeout(convertNext, 3000);
@@ -912,13 +995,13 @@ route('POST', '/admin/books/:id/pdf', async (req, res, b, p, u, c) => {
   send(res, 200, { ok: true, id: await receivePdf(req, c, bk.id) });
 }, { ...W, raw: true });
 // оглавление: ручная правка и автопоиск заново
-route('PUT', '/admin/books/:id/toc', (req, res, b, p, u, c) => {
+route('PUT', '/admin/books/:id/toc', async (req, res, b, p, u, c) => {
   const bk = q('SELECT id, pages FROM books WHERE id=? AND class_id=?').get(int(p.id), c.id); if (!bk) throw new HttpError(404, 'Учебник не найден');
   let toc;
   if (b.auto) {
     let pages = null; try { pages = JSON.parse(fs.readFileSync(path.join(BOOK_DIR, String(bk.id), 'text.json'), 'utf8')); } catch {}
-    if (!pages) bad('У этого учебника нет текста. Загрузите PDF заново кнопкой «Заменить PDF».');
-    toc = findToc(pages);
+    toc = pages && textChars(pages) >= 50 * pages.length ? findToc(pages) : [];
+    if (!toc.length && HAS_OCR) toc = await ocrToc(bk.id, bk.pages);
     if (!toc.length) bad('Оглавление в PDF не нашлось. Впишите его вручную.');
   } else toc = (Array.isArray(b.toc) ? b.toc : []).slice(0, 500).map(x => ({ title: str(x.title, 150), page: Math.max(1, Math.min(bk.pages || 9999, int(x.page) || 1)) })).filter(x => x.title);
   q('UPDATE books SET toc=? WHERE id=?').run(JSON.stringify(toc), bk.id);
@@ -1067,15 +1150,15 @@ db.exec(`CREATE TABLE IF NOT EXISTS stars (id INTEGER PRIMARY KEY, class_id INTE
 const STAR_DEFAULTS = {
   rewards: [
     { price: 5, title: 'Сидеть с другом 1 день' },
-    { price: 6, title: 'Именная наклейка на тетрадь' },
     { price: 8, title: 'Помощник учителя на уроке' },
     { price: 10, title: 'Выбрать место в классе на неделю' },
     { price: 12, title: 'Отмена 1 домашнего задания (по согласию учителя)' },
+    { price: 15, title: 'Набор именных наклеек на тетради' },
     { price: 15, title: 'Второй шанс на проверочную (по согласию учителя)' },
     { price: 20, title: '+1 балл к оценке по русскому языку или литературе' },
   ],
   map: [
-    { steps: 100, icon: '🌳', title: 'Урок на улице' },
+    { steps: 100, icon: '🫖', title: 'Чаепитие всем классом' },
     { steps: 250, icon: '🎲', title: 'Игра на классном часе' },
     { steps: 500, icon: '🍕', title: 'Пицца всем классом' },
     { steps: 800, icon: '🎬', title: 'Кино в классе' },
@@ -1092,6 +1175,24 @@ if (!getSettingRaw('mig_rewards_2211')) {
     q("UPDATE class_settings SET value=? WHERE class_id=? AND key='stars'").run(JSON.stringify(v), r.class_id);
   }
   q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_rewards_2211', '1')").run();
+}
+// зима: «Урок на улице» -> «Чаепитие всем классом», 22.11
+if (!getSettingRaw('mig_map_winter')) {
+  for (const r of q("SELECT class_id, value FROM class_settings WHERE key='stars'").all()) {
+    const v = JSON.parse(r.value || '{}'); if (Array.isArray(v.map)) v.map = v.map.map(x => x.title === 'Урок на улице' ? { ...x, icon: '🫖', title: 'Чаепитие всем классом' } : x);
+    if (Array.isArray(v.rewards)) {
+      const st = v.rewards.find(x => x.title === 'Именная наклейка на тетрадь');
+      if (st) { v.rewards = v.rewards.filter(x => x !== st); v.rewards.push({ price: 15, title: 'Набор именных наклеек на тетради' }); v.rewards.sort((a, b) => a.price - b.price); }
+    }
+    q("UPDATE class_settings SET value=? WHERE class_id=? AND key='stars'").run(JSON.stringify(v), r.class_id);
+  }
+  // «Поддержал(а) одноклассника» убрано совсем
+  for (const m of q("SELECT id, comment FROM marks WHERE help=1 OR comment LIKE '%одноклассника%'").all()) {
+    const com = m.comment.split(/;\s*/).filter(x => !/^Поддержал\S* одноклассника$/i.test(x.trim())).join('; ');
+    q('UPDATE marks SET help=0, comment=? WHERE id=?').run(com, m.id);
+  }
+  q("DELETE FROM marks WHERE mark='good' AND ready=1 AND help=0 AND comment=''").run();
+  q("INSERT OR IGNORE INTO meta(key, value) VALUES('mig_map_winter', '1')").run();
 }
 function starsState(c, full) {
   const set = getSetting(c.id, 'stars', {});
@@ -1112,7 +1213,6 @@ function starsState(c, full) {
       x.earned++; dd.steps++;
       if (lastNote[m.student_id] && lastNote[m.student_id] < m.date && lastNote[m.student_id] >= dayShift(m.date, -14)) { dd.steps++; delete lastNote[m.student_id]; } // вернулся в строй
     }
-    if (m.help) { x.earned += 3; x.helps++; dd.steps += 5; }
   }
   // тихий день: в классе были отметки и ни одного замечания
   for (const [d, v] of Object.entries(day)) if (v.any && !v.notes) v.steps += 5, v.quiet = true;
@@ -1145,7 +1245,7 @@ function starsState(c, full) {
     const x = P[k.id], r = [...RANKS].reverse().find(r => x.earned >= r[0]);
     const next = RANKS.find(r => r[0] > x.earned);
     return { id: k.id, name: k.name, gender: k.gender, balance: x.balance, earned: x.earned, rank: r[1], rankIcon: r[2], next: next ? { title: next[1], need: next[0] - x.earned } : null,
-      badges: [x.helps >= 3 && '🤝 Помощник', x.readyWeeks >= 1 && '🎒 Неделя без забытых тетрадей', x.gave >= 3 && '💛 Щедрая душа'].filter(Boolean) };
+      badges: [x.readyWeeks >= 1 && '🎒 Неделя без забытых тетрадей', x.gave >= 3 && '💛 Щедрая душа'].filter(Boolean) };
   });
   const gd = Object.fromEntries(kids.map(k => [k.id, k.gender]));
   out.log = tx.slice(-30).reverse().map(t => ({ id: t.id, date: t.created_at.slice(0, 10), name: nm[t.student_id] || '-', gender: gd[t.student_id] || '', peer: nm[t.peer_id] || '', amount: t.amount, kind: t.kind, note: t.note }));

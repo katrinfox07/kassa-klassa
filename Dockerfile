@@ -1,5 +1,5 @@
 FROM node:22-alpine
-RUN apk add --no-cache poppler-utils
+RUN apk add --no-cache poppler-utils imagemagick tesseract-ocr tesseract-ocr-data-rus tesseract-ocr-data-eng
 WORKDIR /app
 COPY package.json server.js ./
 COPY public ./public

@@ -604,7 +604,7 @@ const MARK = {
   note: { label: 'Замечание', icon: '💬' },
 };
 const PHRASES = {
-  star: ['Активно работал(а) на уроке', 'Поддержал(а) одноклассника', 'Вежливо общался(ась) с другими', 'Помог(ла) навести порядок в классе', 'Был(а) примером для класса'],
+  star: ['Активно работал(а) на уроке', 'Вежливо общался(ась) с другими', 'Помог(ла) навести порядок в классе', 'Был(а) примером для класса'],
   note: ['Отвлекался(ась) во время объяснения', 'Разговаривал(а) на уроке', 'Не работал(а) по заданию'],
   ready: ['Нет учебника', 'Нет тетради', 'Нет дневника', 'Нет пенала', 'Не сделано домашнее задание', 'Нет формы'],
 };
@@ -687,7 +687,7 @@ function lessonView(tok, opts = {}) {
       const saved = h('span.lsv');
       let timer = null;
       const save = () => {
-        m.help = /одноклассника/.test(m.comment) ? 1 : 0; // «Поддержал(а) одноклассника» = помощь другу (звёзды и шаги карты)
+        m.help = 0;
         drawState();
         clearTimeout(timer);
         timer = setTimeout(async () => {
@@ -699,7 +699,7 @@ function lessonView(tok, opts = {}) {
       };
       const state = h('span.lstate');
       const drawState = () => {
-        state.replaceChildren(MARK[m.mark].icon, m.help ? ' 🤝' : '', m.ready ? '' : ' 🎒', m.comment ? ' ✎' : '');
+        state.replaceChildren(MARK[m.mark].icon, m.ready ? '' : ' 🎒', m.comment ? ' ✎' : '');
         row.dataset.mark = m.mark; row.classList.toggle('notready', !m.ready);
       };
       const comment = h('input.lcom', { value: m.comment, maxlength: 300, placeholder: 'Комментарий (необязательно)', oninput: e => { m.comment = e.target.value; save(); } });
@@ -756,7 +756,7 @@ function journalView(fetchUrl, students) {
       ids.length ? h('div.jlist', ids.map(id => {
         const x = per[id];
         return h('details.jrow', h('summary', h('b', names[id] || 'Ученик'), h('span.jsum', x.star ? h('span.jpill.star', '⭐ ' + x.star) : null, x.note ? h('span.jpill.note', '💬 ' + x.note) : null, x.notReady ? h('span.jpill.ready', '🎒 ' + x.notReady) : null)),
-          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + (m.lesson > 0 && m.lesson < 20 ? ', ' + m.lesson + ' урок' : '') + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.help ? ' · 🤝 ' + G('помог(ла) однокласснику', gen[m.student_id]) : null, m.ready ? null : ' · 🎒 ' + G('не готов(а)', gen[m.student_id]), m.comment ? h('div.small', G(m.comment, gen[m.student_id])) : null))));
+          h('ul.plain.jitems', x.list.map(m => h('li', h('span.muted.small', fd(m.date) + (m.lesson > 0 && m.lesson < 20 ? ', ' + m.lesson + ' урок' : '') + ' · ' + (m.subject || m.tutor)), ' ', MARK[m.mark].icon + ' ' + MARK[m.mark].label, m.ready ? null : ' · 🎒 ' + G('не готов(а)', gen[m.student_id]), m.comment ? h('div.small', G(m.comment, gen[m.student_id])) : null))));
       })) : h('p.muted', 'За этот период особых отметок нет.')));
   };
   load();
@@ -771,13 +771,13 @@ function expeditionView(d) {
   const pct = Math.min(100, steps / max * 100);
   return h('section.card.expd',
     h('h3', '🗺 Экспедиция класса'),
-    h('p.small.muted', 'Общий путь всего класса. Каждая звезда любого ученика, каждый тихий день без замечаний и каждая помощь другу двигают вперёд весь класс.'),
+    h('p.small.muted', 'Общий путь всего класса. Каждая звезда любого ученика, и каждый тихий день без замечаний двигают вперёд весь класс.'),
     h('div.ex-big', h('b', steps), ' шагов пройдено'),
     next ? h('p.ex-next', `До привала «${next.title}» ${next.icon} осталось ${next.steps - steps} шагов`) : h('p.ex-next', '🏆 Весь маршрут пройден! Ура!'),
     h('div.ex-track', h('div.ex-fill', { style: `width:${pct}%` }), map.map(x => h('span.ex-pt' + (x.steps <= steps ? '.got' : ''), { style: `left:${Math.min(100, x.steps / max * 100)}%`, title: x.title }, x.icon))),
     h('ul.plain.ex-stops', map.map(x => h('li' + (x.steps <= steps ? '.got' : ''), h('span.ex-ic', x.icon), h('span.grow', x.title), h('span.small.muted', x.steps <= steps ? 'получено ✓' : x.steps + ' шагов')))),
     d.days?.length ? h('details.more', h('summary', 'Последние дни'), h('ul.plain.ex-days', d.days.map(x => h('li', h('span.muted', fd(x.date)), ' +' + x.steps + ' шагов', x.quiet ? ' · 🌤 тихий день' : '', x.cleanWeek ? ' · ✨ чистая неделя' : '')))) : null,
-    h('p.hint', 'Как идти быстрее: стараться на уроках ⭐, помогать друг другу 🤝, приходить готовыми 🎒. Замечания шаги не отнимают.'),
+    h('p.hint', 'Как идти быстрее: стараться на уроках ⭐, приходить готовыми 🎒. Замечания шаги не отнимают.'),
     d.rewards?.length ? h('div.ex-shop', h('h3', '🎁 Личные награды'),
       h('p.small.muted', 'Свои звёзды каждый копит для себя и сам решает, на что их обменять. Обмен - у классного руководителя.'),
       h('ul.plain.ex-stops', d.rewards.map(r => h('li', h('span.ex-price', '⭐ ' + r.price), h('span.grow', r.title))))) : null);
@@ -794,7 +794,7 @@ function starsView(base, opts = {}) {
       expeditionView(D),
       h('section.card', h('h3', '⭐ Звёзды учеников'),
         h('p.small.muted', 'Видите только вы. Детям не показываем ни рейтингов, ни сравнений. Ребёнку можно сказать его звёзды лично. Нажмите на имя, чтобы начислить, обменять или подарить.'),
-        h('p.small.muted', 'Звёзды: «Умница» +1, фраза «Поддержал(а) одноклассника» +3, неделя без «Не готов(а)» +2. Звания только растут: 🌱 Новичок, 🧭 Искатель (10), 🛡 Мастер (30), 👑 Легенда (60).'),
+        h('p.small.muted', 'Звёзды: «Умница» +1, неделя без «Не готов(а)» +2. Звания только растут: 🌱 Новичок, 🧭 Искатель (10), 🛡 Мастер (30), 👑 Легенда (60).'),
         kidsBox),
       D.log.length ? h('section.card', h('h3', 'История'), h('ul.plain.st-log', D.log.map(t => h('li',
         h('span.muted.small', t.date.split('-').reverse().slice(0, 2).join('.') + ' '),
