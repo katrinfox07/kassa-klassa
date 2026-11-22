@@ -756,10 +756,10 @@ details.part summary { cursor: pointer; font-size: 14px; }
 .expd { display: grid; gap: 8px; }
 .ex-big { font-size: 15px; color: var(--muted); } .ex-big b { font-size: 34px; color: var(--text); margin-right: 4px; }
 .ex-next { font-weight: 700; margin: 0; }
-.ex-track { position: relative; height: 14px; border-radius: 999px; background: var(--bg); margin: 18px 6px 14px; }
+.ex-track { position: relative; height: 14px; border-radius: 999px; background: var(--bg); margin: 22px 18px 20px; }
 .ex-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--grad); transition: width 1s ease; }
-.ex-pt { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 22px; filter: grayscale(1); opacity: .55; }
-.ex-pt.got { filter: none; opacity: 1; }
+.ex-pt { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 18px; line-height: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px var(--line), 0 2px 6px rgba(0,0,0,.08); }
+.ex-pt.got { box-shadow: 0 0 0 2.5px #22c55e, 0 2px 6px rgba(0,0,0,.08); }
 .ex-stops { display: grid; gap: 4px; } .ex-stops li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--bg); }
 .ex-stops li.got { background: var(--ok-soft); } .ex-ic { font-size: 20px; }
 .ex-days li { padding: 3px 0; font-size: 14px; }
