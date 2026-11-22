@@ -796,6 +796,21 @@ const normT = t => String(t || '').toLowerCase().replace(/ё/g, 'е').replace(/[
 const TOC_ENTRY = /^(.{3,160}?)[\s.…·_-]*?(?:\.{2,}|…|\s{2,}|\s)\s*(\d{1,3})\s*$/;
 const isTocPage = t => /(оглавление|содержание|contents)/i.test(String(t).slice(0, 400)) || String(t).split('\n').filter(l => TOC_ENTRY.test(l.trim())).length >= 8;
 // строки «название ..... 12» со страниц содержания (и после распознавания картинок)
+// распознанные номера иногда ошибочны (56 -> 66, 135 -> 185): номера вне общего возрастающего порядка
+// заменяем на соседний верный (самая длинная неубывающая цепочка)
+function fixOrder(entries) {
+  const a = entries.map(e => e.printed), n = a.length; if (n < 3) return entries;
+  const len = Array(n).fill(1), prev = Array(n).fill(-1);
+  for (let i = 0; i < n; i++) for (let j = 0; j < i; j++) if (a[j] <= a[i] && len[j] + 1 > len[i]) { len[i] = len[j] + 1; prev[i] = j; }
+  let k = len.indexOf(Math.max(...len)); const keep = new Set(); while (k >= 0) { keep.add(k); k = prev[k]; }
+  let last = null;
+  for (let i = 0; i < n; i++) {
+    if (keep.has(i)) { last = a[i]; continue; }
+    let nx = null; for (let j = i + 1; j < n; j++) if (keep.has(j)) { nx = a[j]; break; }
+    entries[i].printed = last ?? nx ?? a[i];
+  }
+  return entries;
+}
 // после распознавания: отрезаем точки-«ступеньки» и мусор за ними
 function cleanTocTitle(t) {
   t = String(t).replace(/(\s|^)\$\s?(?=\d)/g, '$1§ ');
@@ -826,11 +841,7 @@ function parseTocEntries(texts) {
       } else carry = l.length < 90 && !/\d{1,3}$/.test(l) ? l : '';
     }
   }
-  // распознанные номера иногда ошибочны: номер, выпадающий из порядка, берём от соседа
-  for (let i = 1; i < entries.length - 1; i++) {
-    const a = entries[i - 1].printed, b = entries[i + 1].printed, x = entries[i].printed;
-    if (a <= b && (x < a || x > b)) entries[i].printed = a;
-  }
+  fixOrder(entries);
   return entries;
 }
 function findToc(pages) {
@@ -876,29 +887,44 @@ async function ocrImage(img, strip) {
   fs.rmSync(tmp, { force: true });
   return txt;
 }
+// похоже ли на настоящее название (а не на мусор распознавания)
+function goodTitle(t) {
+  const L = (t.match(/[A-Za-zА-Яа-яЁё]/g) || []).length; if (L < 4 || L / t.length < 0.5) return false;
+  const cyr = (t.match(/[А-Яа-яЁё]/g) || []).length, lat = L - cyr;
+  const main = cyr >= lat ? /[А-Яа-яЁё]{4,}/ : /[A-Za-z]{4,}/;
+  return Math.max(cyr, lat) / L >= 0.85 && main.test(t);
+}
 async function ocrToc(id, N) {
   if (!HAS_OCR || !N) return [];
   const dir = path.join(BOOK_DIR, String(id)), img = n => path.join(dir, n + '.jpg');
   const cache = {}; const ocr = async i => (cache[i] ??= fs.existsSync(img(i + 1)) ? await ocrImage(img(i + 1)) : '');
+  const kw = t => /(оглавлен|содержан|contents)/i.test(t.slice(0, 300));
+  const stop = t => /(указател|ответы|answers|index)/i.test(t.slice(0, 200));
+  const good = t => parseTocEntries([t]).filter(e => goodTitle(e.title)).length;
   const look = [...new Set([...Array(12).keys()].flatMap(k => [k, N - 1 - k]))].filter(i => i >= 0 && i < N).sort((a, b) => a - b);
-  let start = -1;
-  for (const i of look) if (isTocPage(await ocr(i))) { start = i; break; }
+  let start = -1, bestCnt = 7;
+  for (const i of look) { const t = await ocr(i); if (kw(t) && good(t) >= 3) { start = i; break; } }
+  if (start < 0) for (const i of look) { const t = cache[i]; if (stop(t)) continue; const n = good(t); if (n > bestCnt) { bestCnt = n; start = i; } }
   if (start < 0) return [];
   const group = [start];
-  while (group.length < 8 && group[group.length - 1] + 1 < N && isTocPage(await ocr(group[group.length - 1] + 1))) group.push(group[group.length - 1] + 1);
-  const entries = parseTocEntries(group.map(i => cache[i]));
+  while (group.length < 8) {
+    const nx = group[group.length - 1] + 1; if (nx >= N) break;
+    const t = await ocr(nx); if (stop(t) || kw(t) || good(t) < 4) break; group.push(nx);
+  }
+  const entries = fixOrder(parseTocEntries(group.map(i => cache[i])).filter(e => goodTitle(e.title)));
   if (entries.length < 2) return [];
-  // сдвиг нумерации: читаем номера страниц в верхней и нижней полоске нескольких страниц
+  // сдвиг нумерации: номер страницы в полоске сверху/снизу, причём у следующей страницы он на 1 больше
+  const nums = async (i, strip) => new Set(((await ocrImage(img(i + 1), strip)).match(/(?<!\d)\d{1,3}(?!\d)/g) || []).map(Number));
   const votes = {};
-  for (let k = 1; k <= 10; k++) {
-    const i = Math.floor(N * k / 11); if (group.includes(i)) continue;
+  for (let k = 1; k <= 8; k++) {
+    const i = Math.floor(N * k / 9); if (i + 1 >= N || group.includes(i) || group.includes(i + 1)) continue;
     for (const strip of ['top', 'bottom']) {
-      const nums = ((await ocrImage(img(i + 1), strip)).match(/(?<!\d)\d{1,3}(?!\d)/g) || []).map(Number);
-      for (const n of new Set(nums)) { const d = n - (i + 1); if (d >= -10 && d <= 30) votes[d] = (votes[d] || 0) + 1; }
+      const a = await nums(i, strip), b = await nums(i + 1, strip);
+      for (const n of a) if (b.has(n + 1)) { const d = n - (i + 1); if (d >= -10 && d <= 30) votes[d] = (votes[d] || 0) + 1; }
     }
   }
   const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
-  const d = best && best[1] >= 3 ? +best[0] : 0;
+  const d = best && best[1] >= 2 ? +best[0] : 0;
   return entries.map(e => ({ title: e.title, page: Math.min(N, Math.max(1, e.printed - d)) }));
 }
 // очередь распознавания: по одному учебнику, в фоне
@@ -914,9 +940,9 @@ async function ocrNext() {
       const toc = await ocrToc(bk.id, bk.pages);
       const now = q('SELECT toc FROM books WHERE id=?').get(id);
       if (now && JSON.parse(now.toc || '[]').length === 0 && toc.length) q('UPDATE books SET toc=? WHERE id=?').run(JSON.stringify(toc), id);
-      console.log('[toc-ocr]', id, 'entries', toc.length);
+      console.log('[toc-ocr]', id, 'entries', toc.length, 'first', toc[0] && toc[0].page);
     }
-    q("INSERT OR REPLACE INTO meta(key, value) VALUES(?, '1')").run('tococr_' + id);
+    q("INSERT OR REPLACE INTO meta(key, value) VALUES(?, '1')").run('tococr2_' + id);
   } catch (e) { console.log('[toc-ocr] error', id, e.message); }
   ocrBusy = false; ocrNext();
 }
@@ -958,11 +984,15 @@ function convertNext() {
   pr.on('error', () => done(new Error('На сервере нет pdftoppm')));
   pr.on('close', code => done(code ? new Error('PDF не открылся (код ' + code + ')') : null));
 }
+// первая версия распознавания путала оглавление с ответами: её результаты сбрасываем
+for (const r of q("SELECT key FROM meta WHERE key LIKE 'tococr\\_%' ESCAPE '\\'").all()) {
+  q("UPDATE books SET toc='[]' WHERE id=?").run(+r.key.slice(7)); q('DELETE FROM meta WHERE key=?').run(r.key);
+}
 // учебники без оглавления и без текста: один раз пробуем распознать страницы
 setTimeout(() => {
   if (!HAS_OCR) return console.log('[toc-ocr] нет tesseract');
   for (const b of q("SELECT id, toc FROM books WHERE status='ready' ORDER BY id").all())
-    if (JSON.parse(b.toc || '[]').length === 0 && !getSettingRaw('tococr_' + b.id)) queueOcr(b.id);
+    if (JSON.parse(b.toc || '[]').length === 0 && !getSettingRaw('tococr2_' + b.id)) queueOcr(b.id);
 }, 15000);
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);

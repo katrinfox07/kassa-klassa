@@ -674,7 +674,7 @@ VIEWS['учебники'] = () => {
 
 // оглавление учебника: автопоиск по тексту PDF, ручная правка «страница - название», замена PDF
 function tocDialog(b) {
-  const ta = h('textarea', { rows: 12, placeholder: '5 - § 1. Натуральные числа\n9 - § 2. Сложение и вычитание' }, (b.toc || []).map(t => `${t.page} - ${t.title}`).join('\n'));
+  const ta = h('textarea', { rows: 12, placeholder: 'Пока пусто. Пишите так, по строке на пункт:\nномер страницы - название\nНапример: 12 - Глава 1' }, (b.toc || []).map(t => `${t.page} - ${t.title}`).join('\n'));
   const parse = () => ta.value.split('\n').map(l => /^\s*(\d{1,4})\s*[-–—:.]\s*(.+)$/.exec(l)).filter(Boolean).map(m => ({ page: +m[1], title: m[2].trim() }));
   const file = h('input', { type: 'file', accept: 'application/pdf,.pdf' }), note = h('p.small.muted');
   const close = modal('Оглавление: ' + b.title, h('div.form',
