@@ -661,6 +661,7 @@ VIEWS['учебники'] = () => {
       h('button.btn.small', { 'aria-label': 'Выше', disabled: i === 0, onclick: () => moveBook(i, -1) }, '↑'),
       h('button.btn.small', { 'aria-label': 'Ниже', disabled: i === S.books.length - 1, onclick: () => moveBook(i, 1) }, '↓')),
     b.status === 'ready' ? h('button.btn.small', { onclick: () => openReader(b) }, 'Открыть') : null,
+    b.status === 'ready' ? h('button.btn.small', { title: 'Оглавление', onclick: () => tocDialog(b) }, '☰' + (b.toc?.length ? ' ' + b.toc.length : '')) : null,
     h('button.btn.small', { onclick: () => { const close = modal('Название', h('form.form', { onsubmit: async e => { e.preventDefault(); await act(() => api('PUT', '/api/admin/books/' + b.id, { title: e.target.t.value }), 'Сохранено')(); close(); } },
       h('input', { name: 't', value: b.title, maxlength: 120 }), h('button.btn.primary', { type: 'submit' }, 'Сохранить'))); } }, '✎'),
     h('button.btn.small.danger', { onclick: () => confirmInline(() => {}, `Удалить учебник «${b.title}»?`, async () => { await api('DELETE', '/api/admin/books/' + b.id); toast('Удалено'); load(); }) }, '✕')));
@@ -670,6 +671,34 @@ VIEWS['учебники'] = () => {
     h('section.card', h('h3', '📚 Учебники'), rows.length ? h('div.stack', rows) : h('p.muted', 'Пока пусто. Загрузите первый учебник ниже.')),
     h('section.card', h('h3', 'Добавить учебник'), form));
 };
+
+// оглавление учебника: автопоиск по тексту PDF, ручная правка «страница - название», замена PDF
+function tocDialog(b) {
+  const ta = h('textarea', { rows: 12, placeholder: '5 - § 1. Натуральные числа\n9 - § 2. Сложение и вычитание' }, (b.toc || []).map(t => `${t.page} - ${t.title}`).join('\n'));
+  const parse = () => ta.value.split('\n').map(l => /^\s*(\d{1,4})\s*[-–—:.]\s*(.+)$/.exec(l)).filter(Boolean).map(m => ({ page: +m[1], title: m[2].trim() }));
+  const file = h('input', { type: 'file', accept: 'application/pdf,.pdf' }), note = h('p.small.muted');
+  const close = modal('Оглавление: ' + b.title, h('div.form',
+    h('p.small.muted', `По строке на параграф: номер страницы в читалке (1-${b.pages}), дефис, название. Номер страницы - тот, что показывает читалка вверху, он может отличаться от номера, напечатанного в книге.`),
+    ta,
+    h('div.row', { style: 'gap:8px;flex-wrap:wrap' },
+      h('button.btn.primary', { onclick: async () => { try { await api('PUT', `/api/admin/books/${b.id}/toc`, { toc: parse() }); toast('Оглавление сохранено'); close(); load(); } catch (e) { toast(e.message, true); } } }, 'Сохранить'),
+      h('button.btn', { onclick: async () => { try { const r = await api('PUT', `/api/admin/books/${b.id}/toc`, { auto: true }); ta.value = r.toc.map(t => `${t.page} - ${t.title}`).join('\n'); toast(`Нашлось ${r.toc.length} пунктов, проверьте и сохраните`); load(); } catch (e) { toast(e.message, true); } } }, '🔎 Найти в PDF автоматически')),
+    h('h4', 'Заменить PDF'),
+    h('p.small.muted', 'Учебники, загруженные до 22.11, сохранены только картинками, и оглавление в них само не найдётся. Загрузите тот же PDF ещё раз: страницы обновятся, а оглавление найдётся автоматически.'),
+    file, note,
+    h('button.btn', { onclick: () => {
+      const f = file.files[0]; if (!f) return toast('Выберите PDF-файл', true);
+      const x = new XMLHttpRequest();
+      x.open('POST', apiUrl(`/api/admin/books/${b.id}/pdf`) + '?title=' + encodeURIComponent(b.title));
+      x.setRequestHeader('Content-Type', 'application/pdf');
+      x.upload.onprogress = ev => { if (ev.lengthComputable) note.textContent = `Загружается… ${Math.round(ev.loaded / ev.total * 100)}%`; };
+      x.onload = () => { let r = {}; try { r = JSON.parse(x.responseText); } catch {}
+        if (x.status >= 400) return toast(r.error || 'Не удалось загрузить', true);
+        toast('Загружено, сжимаем страницы и ищем оглавление…'); close(); load(); };
+      x.onerror = () => toast('Связь прервалась, попробуйте ещё раз', true);
+      x.send(f);
+    } }, 'Загрузить PDF заново')));
+}
 
 // перетаскивание обложек: мышью сразу, на телефоне после короткого удержания
 function sortableBooks(grid) {

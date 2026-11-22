@@ -384,7 +384,7 @@ function classState(c, admin) {
     collections,
     payments: admin ? payments : payments.map(p => ({ collection_id: p.collection_id, student_id: p.student_id, amount: p.amount, status: p.status })),
     expenses,
-    books: q("SELECT id, title, pages, status, error FROM books WHERE class_id=? AND (status='ready' OR ?) ORDER BY sort, id").all(cid, admin ? 1 : 0),
+    books: q("SELECT id, title, pages, status, error, toc FROM books WHERE class_id=? AND (status='ready' OR ?) ORDER BY sort, id").all(cid, admin ? 1 : 0).map(b => ({ ...b, toc: JSON.parse(b.toc || '[]') })),
     opening,
     totals: { collected, spent, balance: collected - spent },
   };
@@ -789,20 +789,75 @@ route('POST', '/admin/yadisk', async (req, res, b, p, u, c) => {
 db.exec(`CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
   title TEXT NOT NULL, pages INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'processing', error TEXT NOT NULL DEFAULT '',
   sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+try { db.exec("ALTER TABLE books ADD COLUMN toc TEXT NOT NULL DEFAULT '[]'"); } catch {}
 const { spawn } = require('node:child_process');
+// --- Оглавление: текст страниц (pdftotext) -> строки «название ..... 12» -> страницы PDF ---
+const normT = t => String(t || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9§]+/g, ' ').trim();
+function findToc(pages) {
+  const ENTRY = /^(.{3,160}?)[\s.…·_-]*?(?:\.{2,}|…|\s{2,}|\s)\s*(\d{1,3})\s*$/;
+  const isTocPage = t => /(оглавление|содержание)/i.test(t.slice(0, 400)) || t.split('\n').filter(l => ENTRY.test(l.trim())).length >= 8;
+  const N = pages.length, cand = [];
+  for (let i = 0; i < N; i++) if ((i < 20 || i >= N - 20) && isTocPage(pages[i])) cand.push(i);
+  if (!cand.length) return [];
+  // берём первую группу подряд идущих страниц содержания
+  const group = [cand[0]]; for (const i of cand.slice(1)) if (i === group[group.length - 1] + 1) group.push(i); else break;
+  const entries = [];
+  for (const i of group) {
+    let carry = '';
+    for (const raw of pages[i].split('\n')) {
+      const l = raw.replace(/\s+$/, '').trim(); if (!l) { carry = ''; continue; }
+      if (/^(оглавление|содержание)$/i.test(l)) continue;
+      const m = ENTRY.exec(l);
+      if (m) {
+        let title = ((carry ? carry + ' ' : '') + m[1]).replace(/[\s.…·_-]+$/, '').replace(/\s+/g, ' ').trim();
+        const printed = +m[2];
+        if (title.length >= 3 && !/^\d+$/.test(title) && !/^(глава|раздел|часть|урок|тема|§)\.?$/i.test(title) && printed > 0) entries.push({ title: title.slice(0, 150), printed });
+        carry = '';
+      } else carry = l.length < 90 && !/\d{1,3}$/.test(l) ? l : '';
+    }
+  }
+  if (entries.length < 2) return [];
+  // сдвиг: на какой странице PDF реально стоит заголовок (печатная страница + сдвиг)
+  const offs = {};
+  const skip = new Set(group);
+  for (const e of entries.slice(0, 40)) {
+    const key = normT(e.title).slice(0, 30); if (key.length < 6) continue;
+    for (let d = -10; d <= 30; d++) {
+      const i = e.printed + d - 1; if (i < 0 || i >= N || skip.has(i)) continue;
+      if (normT(pages[i]).includes(key)) { offs[d] = (offs[d] || 0) + 1; break; }
+    }
+  }
+  const best = Object.entries(offs).sort((a, b) => b[1] - a[1])[0];
+  const off = best ? +best[0] : 0;
+  return entries.map(e => ({ title: e.title, page: Math.min(N, Math.max(1, e.printed + off)) }));
+}
+function extractText(pdf, out) {
+  return new Promise(resolve => {
+    const pr = spawn('pdftotext', ['-layout', '-enc', 'UTF-8', pdf, out], { stdio: 'ignore' });
+    pr.on('error', () => resolve(null));
+    pr.on('close', () => { try { resolve(fs.readFileSync(out, 'utf8').split('\f')); } catch { resolve(null); } });
+  });
+}
 const bookQueue = [];
 let bookBusy = false;
 function convertNext() {
   if (bookBusy || !bookQueue.length) return;
   bookBusy = true;
   const id = bookQueue.shift(), dir = path.join(BOOK_DIR, String(id)), pdf = path.join(dir, 'src.pdf');
-  const done = (err) => {
+  const done = async (err) => {
     try {
       if (err) throw err;
       const files = fs.readdirSync(dir).filter(f => /^p-\d+\.jpg$/.test(f)).sort((a, b) => parseInt(a.slice(2)) - parseInt(b.slice(2)));
       if (!files.length) throw new Error('Не удалось прочитать PDF');
+      for (const f of fs.readdirSync(dir)) if (/^\d+\.jpg$/.test(f)) fs.rmSync(path.join(dir, f), { force: true }); // старые страницы при замене PDF
       files.forEach((f, i) => fs.renameSync(path.join(dir, f), path.join(dir, (i + 1) + '.jpg')));
-      q("UPDATE books SET status='ready', pages=?, error='' WHERE id=?").run(files.length, id);
+      // текст страниц сохраняем: по нему ищем оглавление (и сможем искать по учебнику)
+      const pages = await extractText(pdf, path.join(dir, 'text.txt'));
+      if (pages) fs.writeFileSync(path.join(dir, 'text.json'), JSON.stringify(pages.slice(0, files.length)));
+      fs.rmSync(path.join(dir, 'text.txt'), { force: true });
+      const old = JSON.parse(q('SELECT toc FROM books WHERE id=?').get(id)?.toc || '[]');
+      const toc = old.length ? old : (pages ? findToc(pages.slice(0, files.length)) : []);
+      q("UPDATE books SET status='ready', pages=?, error='', toc=? WHERE id=?").run(files.length, JSON.stringify(toc), id);
     } catch (e) { q("UPDATE books SET status='error', error=? WHERE id=?").run(String(e.message || e).slice(0, 200), id); }
     fs.rm(pdf, { force: true }, () => {});
     bookBusy = false; convertNext();
@@ -815,9 +870,10 @@ function convertNext() {
 // при перезапуске доделываем начатое
 for (const b of q("SELECT id FROM books WHERE status='processing'").all()) bookQueue.push(b.id);
 setTimeout(convertNext, 3000);
-route('POST', '/admin/books', async (req, res, b, p, u, c) => {
+// приём PDF: новый учебник или замена файла у существующего (id)
+async function receivePdf(req, c, replaceId) {
   const title = str(new URL(req.url, 'http://x').searchParams.get('title'), 120) || 'Учебник';
-  const id = q("INSERT INTO books(class_id, title, sort) VALUES(?,?, (SELECT COALESCE(MAX(sort),0)+1 FROM books WHERE class_id=?))").run(c.id, title, c.id).lastInsertRowid;
+  const id = replaceId || q("INSERT INTO books(class_id, title, sort) VALUES(?,?, (SELECT COALESCE(MAX(sort),0)+1 FROM books WHERE class_id=?))").run(c.id, title, c.id).lastInsertRowid;
   const dir = path.join(BOOK_DIR, String(id)); fs.mkdirSync(dir, { recursive: true });
   const pdf = path.join(dir, 'src.pdf');
   try {
@@ -833,10 +889,29 @@ route('POST', '/admin/books', async (req, res, b, p, u, c) => {
       out.on('finish', () => head === '%PDF-' ? resolve() : reject(new HttpError(400, 'Это не PDF-файл')));
       out.on('error', reject); req.on('error', reject);
     });
-  } catch (e) { q('DELETE FROM books WHERE id=?').run(id); fs.rm(dir, { recursive: true, force: true }, () => {}); throw e; }
+  } catch (e) { if (!replaceId) { q('DELETE FROM books WHERE id=?').run(id); fs.rm(dir, { recursive: true, force: true }, () => {}); } else fs.rm(pdf, { force: true }, () => {}); throw e; }
+  if (replaceId) q("UPDATE books SET status='processing', error='' WHERE id=?").run(id);
   bookQueue.push(id); convertNext();
-  send(res, 200, { ok: true, id });
+  return id;
+}
+route('POST', '/admin/books', async (req, res, b, p, u, c) => send(res, 200, { ok: true, id: await receivePdf(req, c) }), { ...W, raw: true });
+route('POST', '/admin/books/:id/pdf', async (req, res, b, p, u, c) => {
+  const bk = q('SELECT id FROM books WHERE id=? AND class_id=?').get(int(p.id), c.id); if (!bk) throw new HttpError(404, 'Учебник не найден');
+  send(res, 200, { ok: true, id: await receivePdf(req, c, bk.id) });
 }, { ...W, raw: true });
+// оглавление: ручная правка и автопоиск заново
+route('PUT', '/admin/books/:id/toc', (req, res, b, p, u, c) => {
+  const bk = q('SELECT id, pages FROM books WHERE id=? AND class_id=?').get(int(p.id), c.id); if (!bk) throw new HttpError(404, 'Учебник не найден');
+  let toc;
+  if (b.auto) {
+    let pages = null; try { pages = JSON.parse(fs.readFileSync(path.join(BOOK_DIR, String(bk.id), 'text.json'), 'utf8')); } catch {}
+    if (!pages) bad('У этого учебника нет текста. Загрузите PDF заново кнопкой «Заменить PDF».');
+    toc = findToc(pages);
+    if (!toc.length) bad('Оглавление в PDF не нашлось. Впишите его вручную.');
+  } else toc = (Array.isArray(b.toc) ? b.toc : []).slice(0, 500).map(x => ({ title: str(x.title, 150), page: Math.max(1, Math.min(bk.pages || 9999, int(x.page) || 1)) })).filter(x => x.title);
+  q('UPDATE books SET toc=? WHERE id=?').run(JSON.stringify(toc), bk.id);
+  send(res, 200, { ok: true, toc });
+}, W);
 route('PUT', '/admin/books-order', (req, res, b, p, u, c) => {
   const ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Number.isInteger).slice(0, 500);
   ids.forEach((id, i) => q('UPDATE books SET sort=? WHERE id=? AND class_id=?').run(i + 1, id, c.id));

@@ -559,10 +559,28 @@ function openReader(b) {
     h('div.rd-bar',
       h('button.icon-btn', { onclick: close, 'aria-label': 'Закрыть' }, '✕'),
       h('b.rd-title', b.title),
+      b.toc?.length ? h('button.btn.small.rd-tocb', { onclick: () => openToc(), 'aria-label': 'Оглавление' }, '☰', h('span.rd-toct', ' Оглавление')) : null,
       h('span.rd-pg', cnt, h('span', ' / ' + N)),
       h('span.rd-zoom', h('button.icon-btn', { onclick: () => zoomAt(zoom - .5), 'aria-label': 'Мельче' }, '−'), zl,
         h('button.icon-btn', { onclick: () => zoomAt(zoom + .5), 'aria-label': 'Крупнее' }, '+'))),
     view);
+  // оглавление: список параграфов, нажатие - переход на страницу
+  function openToc() {
+    const old = wrap.querySelector('.rd-toc'); if (old) return old.remove();
+    const cur = [...b.toc].reverse().find(t => t.page <= page);
+    const find = h('input.rd-tocf', { placeholder: 'Найти параграф', type: 'search' });
+    const list = h('ul.plain.rd-tocl');
+    const draw = () => {
+      const f = find.value.trim().toLowerCase();
+      list.replaceChildren(...b.toc.filter(t => !f || t.title.toLowerCase().includes(f)).map(t => h('li', h('button' + (t === cur ? '.on' : ''), { type: 'button', onclick: () => { panel.remove(); go(t.page); } },
+        h('span.grow', t.title), h('span.rd-tocp', 'стр. ' + t.page)))));
+    };
+    find.addEventListener('input', draw);
+    const panel = h('div.rd-toc', h('div.row.between', h('b', 'Оглавление'), h('button.icon-btn', { onclick: () => panel.remove(), 'aria-label': 'Закрыть оглавление' }, '✕')),
+      b.toc.length > 12 ? find : null, list);
+    draw(); wrap.append(panel);
+    setTimeout(() => list.querySelector('.on')?.scrollIntoView({ block: 'center' }), 30);
+  }
   document.body.append(wrap); document.body.classList.add('noscroll');
   addEventListener('resize', onResize); document.addEventListener('keydown', onKey);
   const first = img(1);
