@@ -821,6 +821,8 @@ function parseTocEntries(texts) {
         const printed = +m[2];
         if (title.length >= 3 && !/^\d+$/.test(title) && !/^(глава|раздел|часть|урок|тема|§)\.?$/i.test(title) && printed > 0) entries.push({ title: title.slice(0, 150), printed });
         carry = '';
+      } else if (/^[а-яё]/.test(l) && !carry && entries.length && l.length < 90) { // продолжение предыдущей строки
+        const e = entries[entries.length - 1]; e.title = (e.title + ' ' + cleanTocTitle(l)).slice(0, 150);
       } else carry = l.length < 90 && !/\d{1,3}$/.test(l) ? l : '';
     }
   }
